@@ -1,0 +1,67 @@
+#! /bin/sh
+
+API_URL=https://www.pushbullet.com/api
+
+#Uncomment this to set your pushbullet api key manually.
+#Otherwise, the environment variable API_KEY will be used. Either way, it must be set.
+#API_KEY=
+
+if [ "$1" == "" ];then
+cat << EOF
+Usage: pushbullet <action> <device> <type> <data>
+
+Actions: 
+list (does not require additional parameters)
+push
+
+Types: 
+note (more later)
+
+Data: 
+For the "note" type, put a message in quotes.
+
+EOF
+fi
+
+case $1 in
+list)
+	curl -s "$API_URL/devices" -k -u $API_KEY: | sed 's/{\"id/\n{\"id/g' | cut -d'"' -f12
+	;;
+push)
+
+	dev_id=$(curl -s "$API_URL/devices" -k -u $API_KEY: | sed 's/{\"id/\n{\"id/g' | grep -i $2 | cut -d: -f2 | cut -d, -f1)
+
+	case $3 in
+	note)
+		
+		curl -s "$API_URL/pushes" -k -u $API_KEY: -d device_id=$dev_id -d type=note -d body="$4" | cut -d'"' -f10,20 | tr '"' ' '
+
+	;;
+	
+	address)
+
+	#to-do
+
+	;;
+
+	list)
+
+	#to-do
+
+	;;
+
+	file)
+
+	#to-do
+
+	;;
+
+	link)
+
+	#to-do
+
+	;;
+	esac
+
+	;;
+esac
