@@ -2,9 +2,8 @@
 
 API_URL=https://www.pushbullet.com/api
 
-#Uncomment this to set your pushbullet api key manually.
-#Otherwise, the environment variable API_KEY will be used. Either way, it must be set.
-#API_KEY=
+#Set your pushbullet api key here.
+API_KEY=
 
 if [ "$1" == "" ];then
 cat << EOF
@@ -15,10 +14,14 @@ list (does not require additional parameters)
 push
 
 Types: 
-note (more later)
+note
+address
+link
 
 Data: 
-For the "note" type, put a message in quotes.
+"note" type: put a title in quotes, then the note text in quotes.
+"address" type: put a name in quotes, then the address or Google Maps query in quotes.
+"link" type: put the title of the link in quotes, then the url in quotes.
 
 EOF
 fi
@@ -33,14 +36,14 @@ push)
 
 	case $3 in
 	note)
-		
+
 		curl -s "$API_URL/pushes" -k -u $API_KEY: -d device_id=$dev_id -d type=note -d body="$4" | cut -d'"' -f10,20 | tr '"' ' '
 
 	;;
-	
+
 	address)
 
-	#to-do
+		curl -s "$API_URL/pushes" -k -u $API_KEY: -d device_id=$dev_id -d type=address -d name="$4" -d address="$5" | cut -d'"' -f10,20 | tr '"' ' '
 
 	;;
 
@@ -58,7 +61,7 @@ push)
 
 	link)
 
-	#to-do
+		curl -s "$API_URL/pushes" -k -u $API_KEY: -d device_id=$dev_id -d type=link -d title="$4" -d url="$5" | cut -d'"' -f10,20 | tr '"' ' '
 
 	;;
 	esac
