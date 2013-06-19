@@ -2,7 +2,7 @@
 
 API_URL=https://www.pushbullet.com/api
 
-#Set your pushbullet api key here.
+#Set your pushbullet api key here:
 API_KEY=
 
 if [ "$1" == "" ];then
@@ -16,11 +16,13 @@ push
 Types: 
 note
 address
+file
 link
 
 Data: 
 "note" type: put a title in quotes, then the note text in quotes.
 "address" type: put a name in quotes, then the address or Google Maps query in quotes.
+"file" type: give the path to the file.
 "link" type: put the title of the link in quotes, then the url in quotes.
 
 EOF
@@ -55,7 +57,7 @@ push)
 
 	file)
 
-	#to-do
+		curl -s "$API_URL/pushes" -k -u $API_KEY: -F device_id=$dev_id -F type=file -F file="@$4" -X POST | cut -d'"' -f10,24 | tr '"' ' '
 
 	;;
 
