@@ -1,4 +1,4 @@
-This is a Bash interface to the PushBullet API.
+This is a Bash interface to the PushBullet API (https://www.pushbullet.com/).
 
 It can list your available devices and push different types of data to them.
 
