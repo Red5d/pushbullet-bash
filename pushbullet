@@ -33,22 +33,22 @@ fi
 
 case $1 in
 list)
-	curl -s "$API_URL/devices" -k -u $API_KEY: | sed 's/{\"id/\n{\"id/g' | cut -d'"' -f12
+	curl -s "$API_URL/devices" -u $API_KEY: | sed 's/{\"id/\n{\"id/g' | cut -d'"' -f12
 	;;
 push)
 
-	dev_id=$(curl -s "$API_URL/devices" -k -u $API_KEY: | sed 's/{\"id/\n{\"id/g' | grep -i $2 | cut -d: -f2 | cut -d, -f1)
+	dev_id=$(curl -s "$API_URL/devices" -u $API_KEY: | sed 's/{\"id/\n{\"id/g' | grep -i $2 | cut -d: -f2 | cut -d, -f1)
 
 	case $3 in
 	note)
 
-		curl -s "$API_URL/pushes" -k -u $API_KEY: -d device_id=$dev_id -d type=note -d body="$4" | cut -d'"' -f10,20 | tr '"' ' '
+		curl -s "$API_URL/pushes" -u $API_KEY: -d device_id=$dev_id -d type=note -d body="$4" | cut -d'"' -f10,20 | tr '"' ' '
 
 	;;
 
 	address)
 
-		curl -s "$API_URL/pushes" -k -u $API_KEY: -d device_id=$dev_id -d type=address -d name="$4" -d address="$5" | cut -d'"' -f10,20 | tr '"' ' '
+		curl -s "$API_URL/pushes" -u $API_KEY: -d device_id=$dev_id -d type=address -d name="$4" -d address="$5" | cut -d'"' -f10,20 | tr '"' ' '
 
 	;;
 
@@ -62,19 +62,19 @@ push)
             itemlist=$itemlist" -d items="$i
           fi
         done
-	curl -s $API_URL/pushes -k -u $API_KEY: -d device_id=$dev_id -d type=list -d title=$4 $itemlist | cut -d'"' -f10,14 | tr '"' ' '
+	curl -s $API_URL/pushes -u $API_KEY: -d device_id=$dev_id -d type=list -d title=$4 $itemlist | cut -d'"' -f10,14 | tr '"' ' '
 
 	;;
 
 	file)
 
-		curl -s "$API_URL/pushes" -k -u $API_KEY: -F device_id=$dev_id -F type=file -F file="@$4" -X POST | cut -d'"' -f10,24 | tr '"' ' '
+		curl -s "$API_URL/pushes" -u $API_KEY: -F device_id=$dev_id -F type=file -F file="@$4" -X POST | cut -d'"' -f10,24 | tr '"' ' '
 
 	;;
 
 	link)
 
-		curl -s "$API_URL/pushes" -k -u $API_KEY: -d device_id=$dev_id -d type=link -d title="$4" -d url="$5" | cut -d'"' -f10,20 | tr '"' ' '
+		curl -s "$API_URL/pushes" -u $API_KEY: -d device_id=$dev_id -d type=link -d title="$4" -d url="$5" | cut -d'"' -f10,20 | tr '"' ' '
 
 	;;
 	esac
