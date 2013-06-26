@@ -5,13 +5,13 @@ API_URL=https://www.pushbullet.com/api
 #Set your pushbullet api key here:
 API_KEY=
 
-if [ "$1" == "" ];then
+if [ "$1" = "" ];then
 cat << EOF
 Usage: pushbullet <action> <device> <type> <data>
 
 Actions: 
-list (does not require additional parameters)
-push
+list - Lists all devices in your PushBullet account. (does not require additional parameters)
+push - Pushes data to a device. (the device name can simply be a unique part of the name that "list" returns)
 
 Types: 
 note
@@ -19,13 +19,16 @@ address
 file
 link
 
-Data: 
-"note" type: put a title in quotes, then the note text in quotes.
-"address" type: put a name in quotes, then the address or Google Maps query in quotes.
-"file" type: give the path to the file.
-"link" type: put the title of the link in quotes, then the url in quotes.
+Type Parameters: 
+(all parameters must be put inside quotes if more than one word)
+"note" type: 	give the title, then the note text.
+"address" type: give the address name, then the address or Google Maps query.
+"list" type: 	give the name of the list, then each of the list items, separated by spaces.
+"file" type: 	give the path to the file.
+"link" type: 	give the title of the link, then the url.
 
 EOF
+exit
 fi
 
 case $1 in
@@ -51,7 +54,15 @@ push)
 
 	list)
 
-	#to-do
+	 argnum=0
+        for i in $@
+        do
+          let argnum=$argnum+1
+          if [ $argnum -ge 5 ];then
+            itemlist=$itemlist" -d items="$i
+          fi
+        done
+	curl -s $API_URL/pushes -k -u $API_KEY: -d device_id=$dev_id -d type=list -d title=$4 $itemlist | cut -d'"' -f10,14 | tr '"' ' '
 
 	;;
 
@@ -68,5 +79,30 @@ push)
 	;;
 	esac
 
-	;;
+;;
+
+*)
+  cat << EOF
+Usage: pushbullet <action> <device> <type> <data>
+
+Actions: 
+list - Lists all devices in your PushBullet account. (does not require additional parameters)
+push - Pushes data to a device. (the device name can simply be a unique part of the name that "list" returns)
+
+Types: 
+note
+address
+file
+link
+
+Type Parameters: 
+(all parameters must be put inside quotes if more than one word)
+"note" type: 	give the title, then the note text.
+"address" type: give the address name, then the address or Google Maps query.
+"list" type: 	give the name of the list, then each of the list items, separated by spaces.
+"file" type: 	give the path to the file.
+"link" type: 	give the title of the link, then the url.
+
+EOF
+;;
 esac
