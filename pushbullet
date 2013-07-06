@@ -1,5 +1,10 @@
 #! /bin/sh
 
+# Bash interface to the PushBullet api.
+
+# Author: Red5d - https://github.com/Red5d
+
+
 API_URL=https://www.pushbullet.com/api
 
 #Set your pushbullet api key here:
