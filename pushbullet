@@ -1,16 +1,21 @@
-#! /bin/sh
+#! /bin/bash
 
 # Bash interface to the PushBullet api.
 
 # Author: Red5d - https://github.com/Red5d
 
 
+CONFIG=${XDG_CONFIG_HOME:-$HOME/.config}/pushbullet
 API_URL=https://www.pushbullet.com/api
 
-#Set your pushbullet api key here:
-API_KEY=
+source $CONFIG
 
 if [ "$1" = "" ];then
+
+if [ "$API_KEY" = "" ];then
+echo -e "\e[0;33mWarning, your API key is not set.\nPlease create $CONFIG with a line starting with API_KEY= and your PushBullet key\e[00m"
+fi
+
 cat << EOF
 Usage: pushbullet <action> <device> <type> <data>
 
