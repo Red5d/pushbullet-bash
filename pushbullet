@@ -26,6 +26,7 @@ push - Pushes data to a device. (the device name can simply be a unique part of 
 Types: 
 note
 address
+list
 file
 link
 
@@ -102,6 +103,7 @@ push - Pushes data to a device. (the device name can simply be a unique part of 
 Types: 
 note
 address
+list
 file
 link
 
@@ -116,3 +118,4 @@ Type Parameters:
 EOF
 ;;
 esac
+
