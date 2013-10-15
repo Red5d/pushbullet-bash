@@ -44,22 +44,27 @@ fi
 
 case $1 in
 list)
-	curl -s "$API_URL/devices" -u $API_KEY: | sed 's/{\"id/\n{\"id/g' | cut -d'"' -f12
+	echo "Available devices:"
+	echo "------------------"
+	curl -s "$API_URL/devices" -u $API_KEY: | grep model | cut -d'"' -f4
 	;;
 push)
 
-	dev_id=$(curl -s "$API_URL/devices" -u $API_KEY: | sed 's/{\"id/\n{\"id/g' | grep -i $2 | cut -d: -f2 | cut -d, -f1)
+	devices=$(curl -s "$API_URL/devices" -u $API_KEY: | grep -e model -e \"id)
+	lineNum=$(echo "$devices" | grep -i -n $2 | cut -d: -f1)
+	let lineNum=$lineNum+1
+	dev_id=$(echo "$devices" | sed -n $lineNum'p' | cut -d" " -f8)
 
 	case $3 in
 	note)
 
-		curl -s "$API_URL/pushes" -u $API_KEY: -d device_id=$dev_id -d type=note -d body="$4" | cut -d'"' -f10,20 | tr '"' ' '
+		curl -s "$API_URL/pushes" -u $API_KEY: -d device_id=$dev_id -d type=note -d title="$4" -d body="$5" | sed -n '2p' | cut -d'"' -f2
 
 	;;
 
 	address)
 
-		curl -s "$API_URL/pushes" -u $API_KEY: -d device_id=$dev_id -d type=address -d name="$4" -d address="$5" | cut -d'"' -f10,20 | tr '"' ' '
+		curl -s "$API_URL/pushes" -u $API_KEY: -d device_id=$dev_id -d type=address -d name="$4" -d address="$5" | sed -n '2p' | cut -d'"' -f2
 
 	;;
 
@@ -70,22 +75,22 @@ push)
         do
           let argnum=$argnum+1
           if [ $argnum -ge 5 ];then
-            itemlist=$itemlist" -d items="$i
+            itemlist=$itemlist" -d items=$i"
           fi
         done
-	curl -s $API_URL/pushes -u $API_KEY: -d device_id=$dev_id -d type=list -d title=$4 $itemlist | cut -d'"' -f10,14 | tr '"' ' '
+	curl -s $API_URL/pushes -u $API_KEY: -d device_id=$dev_id -d type=list -d title=$4 $itemlist | sed -n '2p' | cut -d'"' -f2
 
 	;;
 
 	file)
 
-		curl -s "$API_URL/pushes" -u $API_KEY: -F device_id=$dev_id -F type=file -F file="@$4" -X POST | cut -d'"' -f10,24 | tr '"' ' '
+		curl -s "$API_URL/pushes" -u $API_KEY: -F device_id=$dev_id -F type=file -F file="@$4" -X POST #| sed -n '2p' | cut -d'"' -f2
 
 	;;
 
 	link)
 
-		curl -s "$API_URL/pushes" -u $API_KEY: -d device_id=$dev_id -d type=link -d title="$4" -d url="$5" | cut -d'"' -f10,20 | tr '"' ' '
+		curl -s "$API_URL/pushes" -u $API_KEY: -d device_id=$dev_id -d type=link -d title="$4" -d url="$5" | sed -n '2p' | cut -d'"' -f2
 
 	;;
 	esac
