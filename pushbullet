@@ -6,7 +6,7 @@
 
 
 CONFIG=${XDG_CONFIG_HOME:-$HOME/.config}/pushbullet
-API_URL=https://www.pushbullet.com/api
+API_URL=https://api.pushbullet.com/api
 
 source $CONFIG
 
