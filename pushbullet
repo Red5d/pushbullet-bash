@@ -46,7 +46,7 @@ case $1 in
 list)
 	echo "Available devices:"
 	echo "------------------"
-	curl -s "$API_URL/devices" -u $API_KEY: | grep model | cut -d'"' -f4
+	curl -s "$API_URL/devices" -u $API_KEY: | json devices | json -a extras.model
 	;;
 push)
 
