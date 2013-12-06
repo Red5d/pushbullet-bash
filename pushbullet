@@ -50,10 +50,8 @@ list)
 	;;
 push)
 
-	devices=$(curl -s "$API_URL/devices" -u $API_KEY: | grep -e model -e \"id)
-	lineNum=$(echo "$devices" | grep -i -n $2 | cut -d: -f1)
-	let lineNum=$lineNum+1
-	dev_id=$(echo "$devices" | sed -n $lineNum'p' | cut -d" " -f8)
+	devices=$(curl -s "$API_URL/devices" -u $API_KEY: | json devices)
+	dev_id=$(echo "$devices" | json -c "this.extras.model=='$2'" | json 0 | json id)
 
 	case $3 in
 	note)
