@@ -4,8 +4,11 @@
 
 # Author: Red5d - https://github.com/Red5d
 
+if [[ -z "$CONFIG" ]]
+then
+	CONFIG=${XDG_CONFIG_HOME:-$HOME/.config}/pushbullet
+fi
 
-CONFIG=${XDG_CONFIG_HOME:-$HOME/.config}/pushbullet
 API_URL=https://api.pushbullet.com/api
 
 source $CONFIG
