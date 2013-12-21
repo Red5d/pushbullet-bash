@@ -2,7 +2,8 @@
 
 # Bash interface to the PushBullet api.
 
-# Author: Red5d - https://github.com/Red5d
+# Original Author: Red5d - https://github.com/Red5d
+# Author: Sean Payne - https://github.com/zerodivide1
 
 if [[ -z "$CONFIG" ]]
 then
