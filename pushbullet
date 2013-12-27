@@ -10,14 +10,8 @@ API_URL=https://api.pushbullet.com/api
 
 source $CONFIG
 
-if [ "$1" = "" ];then
-
-if [ "$API_KEY" = "" ];then
-echo -e "\e[0;33mWarning, your API key is not set.\nPlease create $CONFIG with a line starting with API_KEY= and your PushBullet key\e[00m"
-fi
-
-cat << EOF
-Usage: pushbullet <action> <device> <type> <data>
+printUsage() {
+echo "Usage: pushbullet <action> <device> <type> <data>
 
 Actions: 
 list - Lists all devices in your PushBullet account. (does not require additional parameters)
@@ -32,13 +26,22 @@ link
 
 Type Parameters: 
 (all parameters must be put inside quotes if more than one word)
-"note" type: 	give the title, then the note text.
-"address" type: give the address name, then the address or Google Maps query.
-"list" type: 	give the name of the list, then each of the list items, separated by spaces.
-"file" type: 	give the path to the file.
-"link" type: 	give the title of the link, then the url.
+\"note\" type: 	give the title, then the note text.
+\"address\" type: give the address name, then the address or Google Maps query.
+\"list\" type: 	give the name of the list, then each of the list items, separated by spaces.
+\"file\" type: 	give the path to the file.
+\"link\" type: 	give the title of the link, then the url.
+"
+}
 
-EOF
+
+if [ "$1" = "" ];then
+
+if [ "$API_KEY" = "" ];then
+echo -e "\e[0;33mWarning, your API key is not set.\nPlease create $CONFIG with a line starting with API_KEY= and your PushBullet key\e[00m"
+fi
+
+printUsage
 exit
 fi
 
@@ -98,29 +101,7 @@ push)
 ;;
 
 *)
-  cat << EOF
-Usage: pushbullet <action> <device> <type> <data>
-
-Actions: 
-list - Lists all devices in your PushBullet account. (does not require additional parameters)
-push - Pushes data to a device. (the device name can simply be a unique part of the name that "list" returns)
-
-Types: 
-note
-address
-list
-file
-link
-
-Type Parameters: 
-(all parameters must be put inside quotes if more than one word)
-"note" type: 	give the title, then the note text.
-"address" type: give the address name, then the address or Google Maps query.
-"list" type: 	give the name of the list, then each of the list items, separated by spaces.
-"file" type: 	give the path to the file.
-"link" type: 	give the title of the link, then the url.
-
-EOF
+  printUsage
 ;;
 esac
 
