@@ -5,7 +5,7 @@
 # Author: Red5d - https://github.com/Red5d
 
 
-CONFIG=${XDG_CONFIG_HOME:-$HOME/.config}/pushbullet
+CONFIG=~/.config/pushbullet
 API_URL=https://api.pushbullet.com/api
 
 source $CONFIG
@@ -49,25 +49,25 @@ case $1 in
 list)
 	echo "Available devices:"
 	echo "------------------"
-	curl -s "$API_URL/devices" -u $API_KEY: | grep model | cut -d'"' -f4
+	curl -s "$API_URL/devices" -u $API_KEY: | tr ',' '\n' | grep model | cut -d '"' -f4
 	;;
 push)
 
-	devices=$(curl -s "$API_URL/devices" -u $API_KEY: | grep -e model -e \"id)
+	devices=$(curl -s "$API_URL/devices" -u $API_KEY: | tr '{' '\n' | tr ',' '\n' | grep model | cut -d'"' -f4)
+	idens=$(curl -s "$API_URL/devices" -u $API_KEY: | tr '{' '\n' | tr ',' '\n' | grep iden | cut -d'"' -f4)
 	lineNum=$(echo "$devices" | grep -i -n $2 | cut -d: -f1)
-	let lineNum=$lineNum+1
-	dev_id=$(echo "$devices" | sed -n $lineNum'p' | cut -d" " -f8)
+	dev_id=$(echo "$idens" | sed -n $lineNum'p')
 
 	case $3 in
 	note)
 
-		curl -s "$API_URL/pushes" -u $API_KEY: -d device_id=$dev_id -d type=note -d title="$4" -d body="$5" | sed -n '2p' | cut -d'"' -f2
+		curl -s "$API_URL/pushes" -u $API_KEY: -d device_iden=$dev_id -d type=note -d title="$4" -d body="$5" -X POST | grep -o "created" | tail -n1
 
 	;;
 
 	address)
 
-		curl -s "$API_URL/pushes" -u $API_KEY: -d device_id=$dev_id -d type=address -d name="$4" -d address="$5" | sed -n '2p' | cut -d'"' -f2
+		curl -s "$API_URL/pushes" -u $API_KEY: -d device_iden=$dev_id -d type=address -d name="$4" -d address="$5" -X POST | grep -o "created" | tail -n1
 
 	;;
 
@@ -81,19 +81,19 @@ push)
             itemlist=$itemlist" -d items=$i"
           fi
         done
-	curl -s $API_URL/pushes -u $API_KEY: -d device_id=$dev_id -d type=list -d title=$4 $itemlist | sed -n '2p' | cut -d'"' -f2
+	curl -s $API_URL/pushes -u $API_KEY: -d device_iden=$dev_id -d type=list -d title=$4 $itemlist -X POST | grep -o "created" | tail -n1
 
 	;;
 
 	file)
 
-		curl -s "$API_URL/pushes" -u $API_KEY: -F device_id=$dev_id -F type=file -F file="@$4" -X POST #| sed -n '2p' | cut -d'"' -f2
+		curl -s "$API_URL/pushes" -u $API_KEY: -F device_iden=$dev_id -F type=file -F file="@$4" -X POST | grep -o "created" | tail -n1
 
 	;;
 
 	link)
 
-		curl -s "$API_URL/pushes" -u $API_KEY: -d device_id=$dev_id -d type=link -d title="$4" -d url="$5" | sed -n '2p' | cut -d'"' -f2
+		curl -s "$API_URL/pushes" -u $API_KEY: -d device_iden=$dev_id -d type=link -d title="$4" -d url="$5" -X POST | grep -o "created" | tail -n1
 
 	;;
 	esac
