@@ -31,7 +31,7 @@ Type Parameters:
 \"note\" type: 	give the title, then the note text.
 \"address\" type: give the address name, then the address or Google Maps query.
 \"list\" type: 	give the name of the list, then each of the list items,
-                seperated by spaces.
+                separated by spaces.
 \"file\" type: 	give the path to the file.
 \"link\" type: 	give the title of the link, then the url.
 "
@@ -53,6 +53,7 @@ list)
 	echo "Available devices:"
 	echo "------------------"
 	curl -s "$API_URL/devices" -u $API_KEY: | tr ',' '\n' | grep model | cut -d '"' -f4
+	echo "all"
 	;;
 push)
 
