@@ -14,8 +14,10 @@ printUsage() {
 echo "Usage: pushbullet <action> <device> <type> <data>
 
 Actions: 
-list - Lists all devices in your PushBullet account. (does not require additional parameters)
-push - Pushes data to a device. (the device name can simply be a unique part of the name that "list" returns)
+list - Lists all devices in your PushBullet account. (does not require
+       additional parameters)
+push - Pushes data to a device. (the device name can simply be a unique part of
+       the name that \"list\" returns)
 
 Types: 
 note
@@ -28,7 +30,8 @@ Type Parameters:
 (all parameters must be put inside quotes if more than one word)
 \"note\" type: 	give the title, then the note text.
 \"address\" type: give the address name, then the address or Google Maps query.
-\"list\" type: 	give the name of the list, then each of the list items, separated by spaces.
+\"list\" type: 	give the name of the list, then each of the list items,
+                seperated by spaces.
 \"file\" type: 	give the path to the file.
 \"link\" type: 	give the title of the link, then the url.
 "
@@ -57,11 +60,14 @@ push)
 	idens=$(curl -s "$API_URL/devices" -u $API_KEY: | tr '{' '\n' | tr ',' '\n' | grep iden | cut -d'"' -f4)
 	lineNum=$(echo "$devices" | grep -i -n $2 | cut -d: -f1)
 	dev_id=$(echo "$idens" | sed -n $lineNum'p')
+	if [ $2 = "all" ];then
+		dev_id=$API_KEY
+	fi
 
 	case $3 in
 	note)
 
-		curl -s "$API_URL/pushes" -u $API_KEY: -d device_iden=$dev_id -d type=note -d title="$4" -d body="$5" -X POST | grep -o "created" | tail -n1
+		curl -s "$API_URL/pushes" -u $API_KEY: -d device_iden=$dev_id -d type=note -d title="$4" -d body="$5" -X POST| grep -o "created" | tail -n1
 
 	;;
 
@@ -104,4 +110,3 @@ push)
   printUsage
 ;;
 esac
-
