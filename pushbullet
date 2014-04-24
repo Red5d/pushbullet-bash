@@ -68,7 +68,11 @@ push)
 	case $3 in
 	note)
 
-		curl -s "$API_URL/pushes" -u $API_KEY: -d device_iden=$dev_id -d type=note -d title="$4" -d body="$5" -X POST| grep -o "created" | tail -n1
+		body=$(cat)
+		if [ ! -z "$5" ]; then
+			body="$5"
+		fi	
+		curl -s "$API_URL/pushes" -u $API_KEY: -d device_iden=$dev_id -d type=note -d title="$4" -d body="$body" -X POST| grep -o "created" | tail -n1
 
 	;;
 
