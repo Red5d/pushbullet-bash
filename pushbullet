@@ -28,7 +28,7 @@ link
 
 Type Parameters: 
 (all parameters must be put inside quotes if more than one word)
-\"note\" type: 	give the title, then the note text.
+\"note\" type: 	give the title, then the note text. The note text can also be given via stdin, leaving the note text field empty.
 \"address\" type: give the address name, then the address or Google Maps query.
 \"list\" type: 	give the name of the list, then each of the list items,
                 separated by spaces.
@@ -37,6 +37,13 @@ Type Parameters:
 "
 }
 
+checkCurlOutput() {
+res=$(echo "$1" | grep -o "created" | tail -n1)
+if [[ "$res" != "created" ]]; then
+	echo "Error submitting the request. The POST error message was:"
+fi
+echo $res
+} 
 
 if [ "$1" = "" ];then
 
@@ -57,6 +64,10 @@ list)
 	;;
 push)
 
+	if [ -z "$2" ]; then
+		printUsage
+		exit
+	fi
 	devices=$(curl -s "$API_URL/devices" -u $API_KEY: | tr '{' '\n' | tr ',' '\n' | grep model | cut -d'"' -f4)
 	idens=$(curl -s "$API_URL/devices" -u $API_KEY: | tr '{' '\n' | tr ',' '\n' | grep iden | cut -d'"' -f4)
 	lineNum=$(echo "$devices" | grep -i -n $2 | cut -d: -f1)
@@ -68,44 +79,59 @@ push)
 	case $3 in
 	note)
 
-		body=$(cat)
+		body=""
+		if [ ! -t 0 ]; then
+			# we have something on stdin
+			body=$(cat)
+			# remove unprintable characters, or pushbullet API fails
+			body=$(echo "$body"|tr -dc '[:print:]\n')
+		fi
 		if [ ! -z "$5" ]; then
 			body="$5"
-		fi	
-		curl -s "$API_URL/pushes" -u $API_KEY: -d device_iden=$dev_id -d type=note -d title="$4" -d body="$body" -X POST| grep -o "created" | tail -n1
+		fi
+		curlres=$(curl -s "$API_URL/pushes" -u $API_KEY: -d device_iden=$dev_id -d type=note -d title="$4" --data-urlencode body="$body" -X POST)
+		checkCurlOutput "$curlres"
 
 	;;
 
 	address)
 
-		curl -s "$API_URL/pushes" -u $API_KEY: -d device_iden=$dev_id -d type=address -d name="$4" -d address="$5" -X POST | grep -o "created" | tail -n1
+                curlres=$(curl -s "$API_URL/pushes" -u $API_KEY: -d device_iden=$dev_id -d type=address -d name="$4" -d address="$5" -X POST)
+                checkCurlOutput "$curlres"
 
 	;;
 
 	list)
 
-	 argnum=0
-        for i in $@
-        do
-          let argnum=$argnum+1
-          if [ $argnum -ge 5 ];then
-            itemlist=$itemlist" -d items=$i"
-          fi
-        done
-	curl -s $API_URL/pushes -u $API_KEY: -d device_iden=$dev_id -d type=list -d title=$4 $itemlist -X POST | grep -o "created" | tail -n1
+		argnum=0
+		for i in $@
+			do
+				let argnum=$argnum+1
+				if [ $argnum -ge 5 ];then
+					itemlist=$itemlist" -d items=$i"
+				fi
+			done
+		curlres=$(curl -s $API_URL/pushes -u $API_KEY: -d device_iden=$dev_id -d type=list -d title=$4 $itemlist -X POST)
+		checkCurlOutput "$curlres"
 
 	;;
 
 	file)
 
-		curl -s "$API_URL/pushes" -u $API_KEY: -F device_iden=$dev_id -F type=file -F file="@$4" -X POST | grep -o "created" | tail -n1
+		curlres=$(curl -s "$API_URL/pushes" -u $API_KEY: -F device_iden=$dev_id -F type=file -F file="@$4" -X POST)
+		checkCurlOutput "$curlres"
 
 	;;
 
 	link)
 
-		curl -s "$API_URL/pushes" -u $API_KEY: -d device_iden=$dev_id -d type=link -d title="$4" -d url="$5" -X POST | grep -o "created" | tail -n1
+		curlres=$(curl -s "$API_URL/pushes" -u $API_KEY: -d device_iden=$dev_id -d type=link -d title="$4" -d url="$5" -X POST)
+		checkCurlOutput "$curlres"
 
+	;;
+
+	*)
+		printUsage
 	;;
 	esac
 
