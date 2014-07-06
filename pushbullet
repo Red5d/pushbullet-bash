@@ -28,7 +28,8 @@ link
 
 Type Parameters: 
 (all parameters must be put inside quotes if more than one word)
-\"note\" type: 	give the title, then the note text. The note text can also be given via stdin, leaving the note text field empty.
+\"note\" type: 	give the title, then the note text. The note text can also be
+                given via stdin, leaving the note text field empty.
 \"address\" type: give the address name, then the address or Google Maps query.
 \"list\" type: 	give the name of the list, then each of the list items,
                 separated by spaces.
@@ -72,9 +73,6 @@ push)
 	idens=$(curl -s "$API_URL/devices" -u $API_KEY: | tr '{' '\n' | tr ',' '\n' | grep iden | cut -d'"' -f4)
 	lineNum=$(echo "$devices" | grep -i -n $2 | cut -d: -f1)
 	dev_id=$(echo "$idens" | sed -n $lineNum'p')
-	if [ $2 = "all" ];then
-		dev_id=$API_KEY
-	fi
 
 	case $3 in
 	note)
@@ -89,7 +87,11 @@ push)
 		if [ ! -z "$5" ]; then
 			body="$5"
 		fi
-		curlres=$(curl -s "$API_URL/pushes" -u $API_KEY: -d device_iden=$dev_id -d type=note -d title="$4" --data-urlencode body="$body" -X POST)
+		if [ $2 = "all" ]; then
+			curlres=$(curl -s "$API_URL/pushes" -u $API_KEY: -d type=note -d title="$4" --data-urlencode body="$body" -X POST)
+		else
+			curlres=$(curl -s "$API_URL/pushes" -u $API_KEY: -d device_iden=$dev_id -d type=note -d title="$4" --data-urlencode body="$body" -X POST)
+		fi
 		checkCurlOutput "$curlres"
 
 	;;
@@ -111,21 +113,31 @@ push)
 					itemlist=$itemlist" -d items=$i"
 				fi
 			done
-		curlres=$(curl -s $API_URL/pushes -u $API_KEY: -d device_iden=$dev_id -d type=list -d title=$4 $itemlist -X POST)
+		if [ $2 = "all" ]; then
+			curlres=$(curl -s $API_URL/pushes -u $API_KEY: -d type=list -d title=$4 $itemlist -X POST)
+		else
+			curlres=$(curl -s $API_URL/pushes -u $API_KEY: -d device_iden=$dev_id -d type=list -d title=$4 $itemlist -X POST)
+		fi
 		checkCurlOutput "$curlres"
 
 	;;
 
 	file)
-
-		curlres=$(curl -s "$API_URL/pushes" -u $API_KEY: -F device_iden=$dev_id -F type=file -F file="@$4" -X POST)
+		if [ $2 = "all" ]; then
+			curlres=$(curl -s "$API_URL/pushes" -u $API_KEY: -F type=file -F file="@$4" -X POST)
+		else
+			curlres=$(curl -s "$API_URL/pushes" -u $API_KEY: -F device_iden=$dev_id -F type=file -F file="@$4" -X POST)
+		fi
 		checkCurlOutput "$curlres"
 
 	;;
 
 	link)
-
-		curlres=$(curl -s "$API_URL/pushes" -u $API_KEY: -d device_iden=$dev_id -d type=link -d title="$4" -d url="$5" -X POST)
+		if [ $2 = "all" ]; then
+			curlres=$(curl -s "$API_URL/pushes" -u $API_KEY: -d type=link -d title="$4" -d url="$5" -X POST)
+		else
+			curlres=$(curl -s "$API_URL/pushes" -u $API_KEY: -d device_iden=$dev_id -d type=link -d title="$4" -d url="$5" -X POST)
+		fi
 		checkCurlOutput "$curlres"
 
 	;;
@@ -138,6 +150,9 @@ push)
 ;;
 
 *)
+  printUsage
+;;
+esac
   printUsage
 ;;
 esac
