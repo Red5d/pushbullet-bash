@@ -153,6 +153,3 @@ push)
   printUsage
 ;;
 esac
-  printUsage
-;;
-esac
