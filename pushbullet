@@ -6,7 +6,7 @@
 
 
 CONFIG=~/.config/pushbullet
-API_URL=https://api.pushbullet.com/api
+API_URL=https://api.pushbullet.com/v2
 
 source $CONFIG
 
@@ -18,6 +18,8 @@ list - Lists all devices in your PushBullet account. (does not require
        additional parameters)
 push - Pushes data to a device. (the device name can simply be a unique part of
        the name that \"list\" returns)
+pushes active - Get your 'active' pushes (pushes that haven't been deleted) 
+delete - Deletes a push, you must give the push 'iden', see https://docs.pushbullet.com/v2/pushes/
 
 Types: 
 note
@@ -36,6 +38,26 @@ Type Parameters:
 \"file\" type: 	give the path to the file.
 \"link\" type: 	give the title of the link, then the url.
 "
+}
+
+function getactivepushes () { 
+    #python -c "import json,sys;[sys.stdout.write(json.dumps(i['iden'])+' '+json.dumps(i['title'])+'\n') for i in json.load(sys.stdin)['pushes'] if i['active'] == True]";
+    python -c "import json,sys
+try:
+	for i in json.load(sys.stdin)['pushes']:
+	    if i['active'] == True:
+		try:
+		    json.dumps(i['title'])
+		    sys.stdout.write(json.dumps(i['iden'])+' '+json.dumps(i['title'])+'\n')
+		except KeyError:
+		    sys.stdout.write(json.dumps(i['iden'])+' (no title)\n')
+except:
+	print 'Cannot decode JSON'"
+}
+
+function deletepush () {
+    curlres=$(curl -s "$API_URL/pushes/$1" -u $API_KEY: -d device_iden=$dev_id -d active="false" -X POST)
+    checkCurlOutput "$curlres"
 }
 
 checkCurlOutput() {
@@ -62,6 +84,25 @@ list)
 	echo "------------------"
 	curl -s "$API_URL/devices" -u $API_KEY: | tr ',' '\n' | grep model | cut -d '"' -f4
 	echo "all"
+	;;
+pushes)
+	case $2 in
+	active)
+		echo "Your active pushes:"
+		echo "------------------"
+		curl -s "$API_URL/pushes" -u $API_KEY: | getactivepushes
+		;;
+	esac
+	;;
+delete)
+	if [ -z "$2" ]; then
+		printUsage
+		exit
+	fi
+	curlres=$(curl -s "$API_URL/pushes/$2" -u $API_KEY: -X DELETE)
+	if [ "$curlres" == '{}' ]; then
+		echo "ok"
+	fi
 	;;
 push)
 
