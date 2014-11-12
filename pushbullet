@@ -41,18 +41,18 @@ Type Parameters:
 }
 
 function getactivepushes () { 
-    #python -c "import json,sys;[sys.stdout.write(json.dumps(i['iden'])+' '+json.dumps(i['title'])+'\n') for i in json.load(sys.stdin)['pushes'] if i['active'] == True]";
-    python -c "import json,sys
-try:
-	for i in json.load(sys.stdin)['pushes']:
-	    if i['active'] == True:
-		try:
-		    json.dumps(i['title'])
-		    sys.stdout.write(json.dumps(i['iden'])+' '+json.dumps(i['title'])+'\n')
-		except KeyError:
-		    sys.stdout.write(json.dumps(i['iden'])+' (no title)\n')
-except:
-	print 'Cannot decode JSON'"
+    allpushes=$(./JSON.sh -l)
+    activepushes=$(echo "$allpushes" | egrep "\[\"pushes\",[0-9]+,\"active\"\].*true"|while read line; do echo "$line"|cut -f 2 -d ,; done)
+    for id in $activepushes
+    do
+      iden=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"iden\"\]"|cut -f 2)
+      title=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"title\"\]"|cut -f 2)
+      if [ -z $title ]; then
+         echo "(no title) $iden"
+      else
+         echo "$title $iden"
+      fi
+    done
 }
 
 function deletepush () {
