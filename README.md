@@ -7,4 +7,4 @@ It can list your available devices and push different types of data to them.
 
 Set your PushBullet API key by creating the file $HOME/.config/pushbullet and adding the line API_KEY=<your key> to it.
 
-This is intended to be a pure bash utility with no outside dependencies.
+This is intended to be a pure Bash utility with no non-Bash dependencies.
