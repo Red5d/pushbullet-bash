@@ -7,6 +7,8 @@
 
 CONFIG=~/.config/pushbullet
 API_URL=https://api.pushbullet.com/v2
+EXECUTABLE="$(readlink -f "$0")"
+PROGDIR="${EXECUTABLE%/*}"
 
 source $CONFIG
 
@@ -41,7 +43,7 @@ Type Parameters:
 }
 
 function getactivepushes () { 
-    allpushes=$(./JSON.sh -l)
+    allpushes=$("$PROGDIR"/JSON.sh -l)
     activepushes=$(echo "$allpushes" | egrep "\[\"pushes\",[0-9]+,\"active\"\].*true"|while read line; do echo "$line"|cut -f 2 -d ,; done)
     for id in $activepushes
     do
