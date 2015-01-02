@@ -84,7 +84,7 @@ case $1 in
 list)
 	echo "Available devices:"
 	echo "------------------"
-	curl -s "$API_URL/devices" -u "$API_KEY": | tr ',' '\n' | grep model | cut -d '"' -f4
+	curl -s "$API_URL/devices" -u "$API_KEY": | tr ',' '\n' | grep nickname | cut -d '"' -f4
 	echo "all"
 	;;
 pushes)
@@ -112,7 +112,7 @@ push)
 		printUsage
 		exit
 	fi
-	devices=$(curl -s "$API_URL/devices" -u "$API_KEY": | tr '{' '\n' | tr ',' '\n' | grep model | cut -d'"' -f4)
+	devices=$(curl -s "$API_URL/devices" -u "$API_KEY": | tr '{' '\n' | tr ',' '\n' | grep nickname | cut -d'"' -f4)
 	idens=$(curl -s "$API_URL/devices" -u "$API_KEY": | tr '{' '\n' | tr ',' '\n' | grep iden | cut -d'"' -f4)
 	lineNum=$(echo "$devices" | grep -i -n "$2" | cut -d: -f1)
 	dev_id=$(echo "$idens" | sed -n $lineNum'p')
