@@ -132,6 +132,8 @@ push)
 		fi
 		if [ "$2" = "all" ]; then
 			curlres=$(curl -s "$API_URL/pushes" -u "$API_KEY": -d type=note -d title="$4" --data-urlencode body="$body" -X POST)
+		elif [[ "$2" == *@* ]]; then
+			curlres=$(curl -s "$API_URL/pushes" -u "$API_KEY": -d email="$2" -d type=note -d title="$4" --data-urlencode body="$body" -X POST)
 		else
 			curlres=$(curl -s "$API_URL/pushes" -u "$API_KEY": -d device_iden="$dev_id" -d type=note -d title="$4" --data-urlencode body="$body" -X POST)
 		fi
