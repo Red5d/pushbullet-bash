@@ -168,10 +168,30 @@ push)
 	;;
 
 	file)
+		# Api docs: https://docs.pushbullet.com/v2/upload-request/
+		mimetype=$(file -i -b $4)
+		curlres=$(curl -s "$API_URL/upload-request" -u "$API_KEY":  -d file_name=$4 -d file_type=${mimetype%:*} -X POST)
+		#echo $curlres | "$PROGDIR"/JSON.sh -b
+		curlres2=$(curl -s -i $(echo $curlres | "$PROGDIR"/JSON.sh -b | grep upload_url |awk -F\" '{print $(NF-1)}') -X POST  \
+		-F awsaccesskeyid=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep awsaccesskeyid |awk -F\" '{print $(NF-1)}') \
+		-F acl=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep acl | awk -F\" '{print $(NF-1)}') \
+		-F key=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep key | tail -1 | awk -F\" '{print $(NF-1)}') \
+		-F signature=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep signature | awk -F\" '{print $(NF-1)}') \
+		-F policy=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep policy | awk -F\" '{print $(NF-1)}') \
+		-F content-type=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep content-type | awk -F\" '{print $(NF-1)}') \
+		-F file=@$4)
 		if [ "$2" = "all" ]; then
-			curlres=$(curl -s "$API_URL/pushes" -u "$API_KEY": -F type=file -F file="@$4" -X POST)
+			curlres=$(curl -s "$API_URL/pushes" -u "$API_KEY": -F type=file \
+			-F file_name=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_name |awk -F\" '{print $(NF-1)}') \
+			-F file_type=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_type |awk -F\" '{print $(NF-1)}') \
+			-F file_url=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_url |awk -F\" '{print $(NF-1)}') \
+			-X POST)
 		else
-			curlres=$(curl -s "$API_URL/pushes" -u "$API_KEY": -F device_iden="$dev_id" -F type=file -F file="@$4" -X POST)
+			curlres=$(curl -s "$API_URL/pushes" -u "$API_KEY": -F device_iden="$dev_id" -F type=file \
+			-F file_name=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_name |awk -F\" '{print $(NF-1)}') \
+			-F file_type=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_type |awk -F\" '{print $(NF-1)}') \
+			-F file_url=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_url |awk -F\" '{print $(NF-1)}') \
+			-X POST)
 		fi
 		checkCurlOutput "$curlres"
 
