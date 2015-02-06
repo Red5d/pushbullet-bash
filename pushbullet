@@ -186,6 +186,12 @@ push)
 			-F file_type=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_type |awk -F\" '{print $(NF-1)}') \
 			-F file_url=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_url |awk -F\" '{print $(NF-1)}') \
 			-X POST)
+		elif [[ "$2" == *@* ]]; then
+			curlres=$(curl -s "$API_URL/pushes" -u "$API_KEY": -F email="$2" -F type=file \
+			-F file_name=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_name |awk -F\" '{print $(NF-1)}') \
+			-F file_type=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_type |awk -F\" '{print $(NF-1)}') \
+			-F file_url=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_url |awk -F\" '{print $(NF-1)}') \
+			-X POST)
 		else
 			curlres=$(curl -s "$API_URL/pushes" -u "$API_KEY": -F device_iden="$dev_id" -F type=file \
 			-F file_name=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_name |awk -F\" '{print $(NF-1)}') \
