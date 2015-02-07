@@ -140,13 +140,12 @@ push)
 	;;
 	list)
 		argnum=0
-		for i in "$@"
-			do
-				let argnum=$argnum+1
-				if [[ $argnum -ge 5 ]];then
-					itemlist=$itemlist" -d items=$i"
-				fi
-			done
+		for i in "$@"; do
+			let argnum=$argnum+1
+			if [[ $argnum -ge 5 ]];then
+				itemlist=$itemlist" -d items=$i"
+			fi
+		done
 		if [ "$2" = "all" ]; then
 			curlres=$(curl -s $API_URL/pushes -u "$API_KEY": -d type=list -d title="$4" $itemlist -X POST)
 		else
