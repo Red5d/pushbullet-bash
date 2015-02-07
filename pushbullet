@@ -43,41 +43,38 @@ Type Parameters:
 }
 
 function getactivepushes () { 
-    allpushes=$("$PROGDIR"/JSON.sh -l)
-    activepushes=$(echo "$allpushes" | egrep "\[\"pushes\",[0-9]+,\"active\"\].*true"|while read line; do echo "$line"|cut -f 2 -d ,; done)
-    for id in $activepushes
-    do
-      iden=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"iden\"\]"|cut -f 2)
-      title=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"title\"\]"|cut -f 2)
-      if [[ -z "$title" ]]; then
-         echo "(no title) $iden"
-      else
-         echo "$title $iden"
-      fi
-    done
+	allpushes=$("$PROGDIR"/JSON.sh -l)
+	activepushes=$(echo "$allpushes" | egrep "\[\"pushes\",[0-9]+,\"active\"\].*true"|while read line; do echo "$line"|cut -f 2 -d ,; done)
+	for id in $activepushes; do
+		iden=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"iden\"\]"|cut -f 2)
+		title=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"title\"\]"|cut -f 2)
+		if [[ -z "$title" ]]; then
+			echo "(no title) $iden"
+		else
+			echo "$title $iden"
+		fi
+	done
 }
 
 function deletepush () {
-    curlres=$(curl -s "$API_URL/pushes/$1" -u "$API_KEY": -d device_iden="$dev_id" -d active="false" -X POST)
-    checkCurlOutput "$curlres"
+	curlres=$(curl -s "$API_URL/pushes/$1" -u "$API_KEY": -d device_iden="$dev_id" -d active="false" -X POST)
+	checkCurlOutput "$curlres"
 }
 
 checkCurlOutput() {
-res=$(echo "$1" | grep -o "created" | tail -n1)
-if [[ "$res" != "created" ]]; then
-	echo "Error submitting the request. The POST error message was:"
-fi
-echo "$res"
+	res=$(echo "$1" | grep -o "created" | tail -n1)
+	if [[ "$res" != "created" ]]; then
+		echo "Error submitting the request. The POST error message was:"
+	fi
+	echo "$res"
 } 
 
 if [ "$1" = "" ];then
-
-if [ "$API_KEY" = "" ];then
-echo -e "\e[0;33mWarning, your API key is not set.\nPlease create $CONFIG with a line starting with API_KEY= and your PushBullet key\e[00m"
-fi
-
-printUsage
-exit
+	if [ "$API_KEY" = "" ];then
+		echo -e "\e[0;33mWarning, your API key is not set.\nPlease create $CONFIG with a line starting with API_KEY= and your PushBullet key\e[00m"
+	fi
+	printUsage
+	exit
 fi
 
 case $1 in
@@ -107,7 +104,6 @@ delete)
 	fi
 	;;
 push)
-
 	if [ -z "$2" ]; then
 		printUsage
 		exit
@@ -119,7 +115,6 @@ push)
 
 	case $3 in
 	note)
-
 		body=""
 		if [ ! -t 0 ]; then
 			# we have something on stdin
@@ -138,18 +133,12 @@ push)
 			curlres=$(curl -s "$API_URL/pushes" -u "$API_KEY": -d device_iden="$dev_id" -d type=note -d title="$4" --data-urlencode body="$body" -X POST)
 		fi
 		checkCurlOutput "$curlres"
-
 	;;
-
 	address)
-
-                curlres=$(curl -s "$API_URL/pushes" -u "$API_KEY": -d device_iden="$dev_id" -d type=address -d name="$4" -d address="$5" -X POST)
-                checkCurlOutput "$curlres"
-
+		curlres=$(curl -s "$API_URL/pushes" -u "$API_KEY": -d device_iden="$dev_id" -d type=address -d name="$4" -d address="$5" -X POST)
+		checkCurlOutput "$curlres"
 	;;
-
 	list)
-
 		argnum=0
 		for i in "$@"
 			do
@@ -200,7 +189,6 @@ push)
 			-X POST)
 		fi
 		checkCurlOutput "$curlres"
-
 	;;
 
 	link)
@@ -210,17 +198,15 @@ push)
 			curlres=$(curl -s "$API_URL/pushes" -u "$API_KEY": -d device_iden="$dev_id" -d type=link -d title="$4" -d url="$5" -X POST)
 		fi
 		checkCurlOutput "$curlres"
-
 	;;
 
 	*)
 		printUsage
 	;;
 	esac
-
 ;;
 
 *)
-  printUsage
-;;
+	printUsage
+	;;
 esac
