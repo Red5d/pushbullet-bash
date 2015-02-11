@@ -139,20 +139,19 @@ push)
 		checkCurlOutput "$curlres"
 	;;
 	list)
-		argnum=0
-		for i in "$@"; do
-			let argnum=$argnum+1
-			if [[ $argnum -ge 5 ]];then
-				itemlist=$itemlist" -d items=$i"
-			fi
-		done
+		# print all array items after $4, convert them to a JSON array
+		# URLencoded data requests do not work for lists at the moment 
+		itemlist=$(printf '%s\n' "${@:5}" \
+			| awk ' BEGIN { ORS = ""; print "["; } { print "/@"$0"/@"; } END { print "]"; }' \
+			| sed "s^\"^\\\\\"^g;s^\/\@\/\@^\", \"^g;s^\/\@^\"^g")
 		if [ "$2" = "all" ]; then
-			curlres=$(curl -s $API_URL/pushes -u "$API_KEY": -d type=list -d title="$4" $itemlist -X POST)
+		  JsonData='{"type": "list", "title": "'"$4"'", "items": '"$itemlist"'}'
 		else
-			curlres=$(curl -s $API_URL/pushes -u "$API_KEY": -d device_iden="$dev_id" -d type=list -d title="$4" $itemlist -X POST)
+		  JsonData='{"type": "list", "device_iden": "'"$dev_id"'", "title":"'"$4"'", "items":'"$itemlist"'}'
 		fi
+		curlres=$(curl -s $API_URL/pushes -u "$API_KEY": -X POST \
+		  --header 'Content-Type: application/json' --data-binary "$JsonData")
 		checkCurlOutput "$curlres"
-
 	;;
 
 	file)
