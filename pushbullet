@@ -6,15 +6,17 @@
 
 
 if [ ! -n "$PB_CONFIG" ]; then
-        PB_CONFIG=~/.config/pushbullet
+	PB_CONFIG=~/.config/pushbullet
 fi
+source $PB_CONFIG > /dev/null 2>&1
 
 API_URL=https://api.pushbullet.com/v2
 EXECUTABLE="$(cd "$( dirname "$0" )" && pwd )"
 PROGDIR="${EXECUTABLE%/*}"
 
-if [ ! -n "$PB_API_KEY" ]; then
-	source $PB_CONFIG
+if [ -z "$PB_API_KEY" ]; then
+	echo "could not find api key"
+	exit 1
 fi
 
 printUsage() {
@@ -154,11 +156,7 @@ push)
 		else
 		  JsonData='{"type": "list", "device_iden": "'"$dev_id"'", "title":"'"$4"'", "items":'"$itemlist"'}'
 		fi
-<<<<<<< HEAD
-		curlres=$(curl -s $API_URL/pushes -u "$API_KEY": -X POST \
-=======
 		curlres=$(curl -s $API_URL/pushes -u "$PB_API_KEY": -X POST \
->>>>>>> upstream/master
 		  --header 'Content-Type: application/json' --data-binary "$JsonData")
 		checkCurlOutput "$curlres"
 	;;
