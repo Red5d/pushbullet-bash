@@ -116,7 +116,7 @@ push)
 		exit
 	fi
 	devices=$(curl -s "$API_URL/devices" -u "$PB_API_KEY": | tr '{' '\n' | tr ',' '\n' | grep nickname | cut -d'"' -f4)
-	idens=$(curl -s "$API_URL/devices" -u "$PB_API_KEY": | tr '{' '\n' | grep active:\"true |  tr ',' '\n' | grep iden | cut -d'"' -f4)
+	idens=$(curl -s "$API_URL/devices" -u "$PB_API_KEY": | tr '{' '\n' | grep active\"\:true |  tr ',' '\n' | grep iden | cut -d'"' -f4)
 	lineNum=$(echo "$devices" | grep -i -n "$2" | cut -d: -f1)
 	dev_id=$(echo "$idens" | sed -n $lineNum'p')
 
