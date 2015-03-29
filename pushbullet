@@ -28,7 +28,8 @@ list - Lists all devices in your PushBullet account. (does not require
 push - Pushes data to a device. (the device name can simply be a unique part of
        the name that \"list\" returns)
 pushes active - Get your 'active' pushes (pushes that haven't been deleted) 
-delete - Deletes a push, you must give the push 'iden', see https://docs.pushbullet.com/v2/pushes/
+delete $iden - Deletes a push, you must give the push 'iden', see https://docs.pushbullet.com/v2/pushes/
+delete all - Deletes all pushes
 
 Types: 
 note
@@ -101,15 +102,27 @@ pushes)
 	esac
 	;;
 delete)
-	if [ -z "$2" ]; then
+	case $2 in
+	"")
 		printUsage
-		exit
-	fi
-	curlres=$(curl -s "$API_URL/pushes/$2" -u "$PB_API_KEY": -X DELETE)
-	if [ "$curlres" == '{}' ]; then
-		echo "ok"
-	fi
-	;;
+		;;
+	all)
+		echo "deleting all pushes"
+		curlres=$(curl -s "$API_URL/pushes" -u "$PB_API_KEY": -X DELETE)
+		if [ ! "$curlres" == '{}' ]; then
+			echo "something went wrong"
+			exit 1
+		fi
+		;;
+	*)
+		echo "deleting only $2"
+		curlres=$(curl -s "$API_URL/pushes/$2" -u "$PB_API_KEY": -X DELETE)
+		if [ ! "$curlres" == '{}' ]; then
+			echo "something went wrong"
+			exit 1
+		fi
+		;;
+	esac
 push)
 	if [ -z "$2" ]; then
 		printUsage
