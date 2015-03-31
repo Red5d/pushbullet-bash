@@ -11,11 +11,10 @@ fi
 source $PB_CONFIG > /dev/null 2>&1
 
 API_URL=https://api.pushbullet.com/v2
-EXECUTABLE="$(cd "$( dirname "$0" )" && pwd )"
-PROGDIR="${EXECUTABLE%/*}"
+PROGDIR="$(cd "$( dirname "$0" )" && pwd )"
 
 if [ -z "$PB_API_KEY" ]; then
-	echo "could not find api key"
+	echo -e "\e[0;33mWarning, your API key is not set.\nPlease create \"$PB_CONFIG\" with a line starting with PB_API_KEY= and your PushBullet key\e[00m"
 	exit 1
 fi
 
@@ -46,8 +45,9 @@ Type Parameters:
 \"list\" type: 	give the name of the list, then each of the list items,
                 separated by spaces.
 \"file\" type: 	give the path to the file.
-\"link\" type: 	give the title of the link, then the url.
+\"link\" type: 	give the title of the link then the url and the the message body
 "
+exit 1
 }
 
 function getactivepushes () { 
@@ -64,26 +64,14 @@ function getactivepushes () {
 	done
 }
 
-function deletepush () {
-	curlres=$(curl -s "$API_URL/pushes/$1" -u "$PB_API_KEY": -d device_iden="$dev_id" -d active="false" -X POST)
-	checkCurlOutput "$curlres"
-}
-
 checkCurlOutput() {
 	res=$(echo "$1" | grep -o "created" | tail -n1)
 	if [[ "$res" != "created" ]]; then
 		echo "Error submitting the request. The POST error message was:"
+		exit 1
 	fi
 	echo "$res"
 } 
-
-if [ "$1" = "" ];then
-	if [ "$PB_API_KEY" = "" ];then
-		echo -e "\e[0;33mWarning, your API key is not set.\nPlease create $PB_CONFIG with a line starting with PB_API_KEY= and your PushBullet key\e[00m"
-	fi
-	printUsage
-	exit
-fi
 
 case $1 in
 list)
@@ -126,10 +114,9 @@ delete)
 push)
 	if [ -z "$2" ]; then
 		printUsage
-		exit
 	fi
 	devices=$(curl -s "$API_URL/devices" -u "$PB_API_KEY": | tr '{' '\n' | tr ',' '\n' | grep nickname | cut -d'"' -f4)
-	idens=$(curl -s "$API_URL/devices" -u "$PB_API_KEY": | tr '{' '\n' | tr ',' '\n' | grep iden | cut -d'"' -f4)
+	idens=$(curl -s "$API_URL/devices" -u "$PB_API_KEY": | tr '{' '\n' | grep active\"\:true |  tr ',' '\n' | grep iden | cut -d'"' -f4)
 	lineNum=$(echo "$devices" | grep -i -n "$2" | cut -d: -f1)
 	dev_id=$(echo "$idens" | sed -n $lineNum'p')
 
@@ -211,9 +198,9 @@ push)
 
 	link)
 		if [ "$2" = "all" ]; then
-			curlres=$(curl -s "$API_URL/pushes" -u "$PB_API_KEY": -d type=link -d title="$4" -d url="$5" -X POST)
+			curlres=$(curl -s "$API_URL/pushes" -u "$PB_API_KEY": -d type=link -d title="$4" -d url="$5" -d body="$6" -X POST)
 		else
-			curlres=$(curl -s "$API_URL/pushes" -u "$PB_API_KEY": -d device_iden="$dev_id" -d type=link -d title="$4" -d url="$5" -X POST)
+			curlres=$(curl -s "$API_URL/pushes" -u "$PB_API_KEY": -d device_iden="$dev_id" -d type=link -d title="$4" -d url="$5" -d body="$6" -X POST)
 		fi
 		checkCurlOutput "$curlres"
 	;;
