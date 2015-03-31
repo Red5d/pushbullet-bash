@@ -11,8 +11,7 @@ fi
 source $PB_CONFIG > /dev/null 2>&1
 
 API_URL=https://api.pushbullet.com/v2
-EXECUTABLE="$(cd "$( dirname "$0" )" && pwd )"
-PROGDIR="${EXECUTABLE%/*}"
+PROGDIR="$(cd "$( dirname "$0" )" && pwd )"
 
 if [ -z "$PB_API_KEY" ]; then
 	echo "could not find api key"
