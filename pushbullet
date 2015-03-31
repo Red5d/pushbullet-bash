@@ -45,7 +45,7 @@ Type Parameters:
 \"list\" type: 	give the name of the list, then each of the list items,
                 separated by spaces.
 \"file\" type: 	give the path to the file.
-\"link\" type: 	give the title of the link, then the url.
+\"link\" type: 	give the title of the link then the url and the the message body
 "
 }
 
@@ -116,7 +116,7 @@ push)
 		exit
 	fi
 	devices=$(curl -s "$API_URL/devices" -u "$PB_API_KEY": | tr '{' '\n' | tr ',' '\n' | grep nickname | cut -d'"' -f4)
-	idens=$(curl -s "$API_URL/devices" -u "$PB_API_KEY": | tr '{' '\n' | tr ',' '\n' | grep iden | cut -d'"' -f4)
+	idens=$(curl -s "$API_URL/devices" -u "$PB_API_KEY": | tr '{' '\n' | grep active\"\:true |  tr ',' '\n' | grep iden | cut -d'"' -f4)
 	lineNum=$(echo "$devices" | grep -i -n "$2" | cut -d: -f1)
 	dev_id=$(echo "$idens" | sed -n $lineNum'p')
 
@@ -198,9 +198,9 @@ push)
 
 	link)
 		if [ "$2" = "all" ]; then
-			curlres=$(curl -s "$API_URL/pushes" -u "$PB_API_KEY": -d type=link -d title="$4" -d url="$5" -X POST)
+			curlres=$(curl -s "$API_URL/pushes" -u "$PB_API_KEY": -d type=link -d title="$4" -d url="$5" -d body="$6" -X POST)
 		else
-			curlres=$(curl -s "$API_URL/pushes" -u "$PB_API_KEY": -d device_iden="$dev_id" -d type=link -d title="$4" -d url="$5" -X POST)
+			curlres=$(curl -s "$API_URL/pushes" -u "$PB_API_KEY": -d device_iden="$dev_id" -d type=link -d title="$4" -d url="$5" -d body="$6" -X POST)
 		fi
 		checkCurlOutput "$curlres"
 	;;
