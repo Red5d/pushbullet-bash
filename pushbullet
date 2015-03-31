@@ -11,8 +11,7 @@ fi
 source $PB_CONFIG > /dev/null 2>&1
 
 API_URL=https://api.pushbullet.com/v2
-EXECUTABLE="$(cd "$( dirname "$0" )" && pwd )"
-PROGDIR="${EXECUTABLE%/*}"
+PROGDIR="$(cd "$( dirname "$0" )" && pwd )"
 
 if [ -z "$PB_API_KEY" ]; then
 	echo -e "\e[0;33mWarning, your API key is not set.\nPlease create \"$PB_CONFIG\" with a line starting with PB_API_KEY= and your PushBullet key\e[00m"
