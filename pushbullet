@@ -111,6 +111,7 @@ delete)
 		fi
 		;;
 	esac
+        ;;
 push)
 	if [ -z "$2" ]; then
 		printUsage
