@@ -87,6 +87,9 @@ pushes)
 		echo "------------------"
 		curl -s "$API_URL/pushes?active=true" -u "$PB_API_KEY": | getactivepushes
 		;;
+	*)
+		printUsage
+		;;
 	esac
 	;;
 delete)
