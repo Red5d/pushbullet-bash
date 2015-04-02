@@ -50,7 +50,7 @@ Type Parameters:
 exit 1
 }
 
-function getactivepushes () { 
+function getactivepushes () {
 	allpushes=$("$PROGDIR"/JSON.sh -l)
 	activepushes=$(echo "$allpushes" | egrep "\[\"pushes\",[0-9]+,\"active\"\].*true"|while read line; do echo "$line"|cut -f 2 -d ,; done)
 	for id in $activepushes; do
@@ -85,7 +85,7 @@ pushes)
 	active)
 		echo "Your active pushes:"
 		echo "------------------"
-		curl -s "$API_URL/pushes" -u "$PB_API_KEY": | getactivepushes
+		curl -s "$API_URL/pushes?active=true" -u "$PB_API_KEY": | getactivepushes
 		;;
 	esac
 	;;
@@ -116,8 +116,9 @@ push)
 	if [ -z "$2" ]; then
 		printUsage
 	fi
-	devices=$(curl -s "$API_URL/devices" -u "$PB_API_KEY": | tr '{' '\n' | tr ',' '\n' | grep nickname | cut -d'"' -f4)
-	idens=$(curl -s "$API_URL/devices" -u "$PB_API_KEY": | tr '{' '\n' | grep active\"\:true |  tr ',' '\n' | grep iden | cut -d'"' -f4)
+	curlres=$(curl -s "$API_URL/devices" -u "$PB_API_KEY":)
+	devices=$(echo "$curlres" | tr '{' '\n' | tr ',' '\n' | grep nickname | cut -d'"' -f4)
+	idens=$(echo "$curlres" | tr '{' '\n' | grep active\"\:true |  tr ',' '\n' | grep iden | cut -d'"' -f4)
 	lineNum=$(echo "$devices" | grep -i -n "$2" | cut -d: -f1)
 	dev_id=$(echo "$idens" | sed -n $lineNum'p')
 
