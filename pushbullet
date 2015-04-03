@@ -111,7 +111,7 @@ delete)
 		echo "deleting all pushes except the last $3"
 		number=$(($3+1))
 		allpushes=$(curl -s "$API_URL/pushes?active=true" -u "$PB_API_KEY": | "$PROGDIR"/JSON.sh -l)
-		activepushes=$(echo "$allpushes" | egrep "\[\"pushes\",[0-9]+,\"active\"\].*true"|while read line; do echo "$line"|cut -f 2 -d ,; done | tail -n +$number)
+		activepushes=$(echo "$allpushes" | egrep "\[\"pushes\",[0-9]+,\"active\"\].*true"|while read line; do echo "$line"|cut -f 2 -d ,; done | tail -n "+$number")
 		for id in $activepushes; do
 			iden=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"iden\"\]"|cut -f 2 | cut -d'"' -f 2)
 			echo "Deleting \"$iden\""
