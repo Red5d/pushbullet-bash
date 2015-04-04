@@ -44,8 +44,8 @@ Type Parameters:
 \"address\" type: give the address name, then the address or Google Maps query.
 \"list\" type: 	give the name of the list, then each of the list items,
                 separated by spaces.
-\"file\" type: 	give the path to the file.
-\"link\" type: 	give the title of the link then the url and the the message body
+\"file\" type: 	give the path to the file and an optional message body.
+\"link\" type: 	give the title of the link then the url and an optional message body.
 "
 exit 1
 }
@@ -184,19 +184,19 @@ push)
 			-F file_name=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_name |awk -F\" '{print $(NF-1)}') \
 			-F file_type=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_type |awk -F\" '{print $(NF-1)}') \
 			-F file_url=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_url |awk -F\" '{print $(NF-1)}') \
-			-X POST)
+			-F body="$5" -X POST)
 		elif [[ "$2" == *@* ]]; then
 			curlres=$(curl -s "$API_URL/pushes" -u "$PB_API_KEY": -F email="$2" -F type=file \
 			-F file_name=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_name |awk -F\" '{print $(NF-1)}') \
 			-F file_type=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_type |awk -F\" '{print $(NF-1)}') \
 			-F file_url=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_url |awk -F\" '{print $(NF-1)}') \
-			-X POST)
+			-F body="$5" -X POST)
 		else
 			curlres=$(curl -s "$API_URL/pushes" -u "$PB_API_KEY": -F device_iden="$dev_id" -F type=file \
 			-F file_name=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_name |awk -F\" '{print $(NF-1)}') \
 			-F file_type=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_type |awk -F\" '{print $(NF-1)}') \
 			-F file_url=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_url |awk -F\" '{print $(NF-1)}') \
-			-X POST)
+			-F body="$5" -X POST)
 		fi
 		checkCurlOutput "$curlres"
 	;;
