@@ -9,4 +9,4 @@ Set your PushBullet API key by creating the file $HOME/.config/pushbullet and ad
 
 This is intended to be a pure Bash utility with no non-Bash dependencies.
 
-Pushbullet-bash also features a shell function similar to projects like pushblast(https://github.com/alebcay/pushblast), pushbullet-exit(https://github.com/rfilmyer/pushbullet-exit) and pace(https://github.com/esamson/pace) to send a message after a specific command has finished.
+Pushbullet-bash also features a shell function similar to projects like [pushblast](https://github.com/alebcay/pushblast), [pushbullet-exit](https://github.com/rfilmyer/pushbullet-exit) and [pace](https://github.com/esamson/pace) to send a message after a specific command has finished.
