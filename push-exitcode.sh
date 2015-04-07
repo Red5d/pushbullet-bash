@@ -27,4 +27,5 @@ pb() {
 	fi
 
 	pushbullet push all note "$PUSH_TITLE Command completed on $(hostname)" "Finished $* in $TIME. Return code was $EXITCODE."
+	return $EXITCODE
 }
