@@ -18,17 +18,22 @@ if [ -z "$PB_API_KEY" ]; then
 	exit 1
 fi
 
+if [ ! $(which curl) ]; then
+	echo "pushbullet-bash requires curl to run. Please install curl"
+	exit 1
+fi
+
 printUsage() {
 echo "Usage: pushbullet <action> <device> <type> <data>
 
 Actions:
 list - List all devices and contacts in your PushBullet account. (does not require
        additional parameters)
-push - Pushes data to a device. (the device name can simply be a unique part of
-       the name that \"list\" returns)
-pushes active - Get your 'active' pushes (pushes that haven't been deleted) 
-delete $iden - Deletes a push, you must give the push 'iden', see https://docs.pushbullet.com/v2/pushes/
-delete all - Deletes all pushes
+push - Push data to a device or contact. (the device name can simply be
+       a unique part of the name that \"list\" returns)
+pushes active - List your 'active' pushes (pushes that haven't been deleted).
+delete \$iden - Delete a specific push.
+delete all - Delete all pushes.
 
 Types: 
 note
@@ -57,21 +62,23 @@ function getactivepushes () {
 		iden=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"iden\"\]"|cut -f 2)
 		title=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"title\"\]"|cut -f 2)
 		if [[ -z "$title" ]]; then
-			echo "(no title) $iden"
-		else
-			echo "$title $iden"
+			title="(no title)"
 		fi
+		echo "$title $iden"
 	done
 }
 
 checkCurlOutput() {
 	res=$(echo "$1" | grep -o "created" | tail -n1)
-	if [[ "$res" != "created" ]]; then
-		echo "Error submitting the request. The POST error message was:"
+	if [[ "$1" == *"The param 'channel_tag' has an invalid value."* ]] && [ "$1" == *"The param 'device_iden' has an invalid value."* ]]; then
+		echo "Error: You specified an unknown device or channel."
+		exit 1
+	elif [[ "$res" != "created" ]] && [[ ! "$1" == "{}" ]]; then
+		echo "Error submitting the request. The error message was:" $1
 		exit 1
 	fi
-	echo "$res"
-} 
+	echo "Success"
+}
 
 case $1 in
 list)
@@ -104,28 +111,22 @@ delete)
 	all)
 		echo "deleting all pushes"
 		curlres=$(curl -s "$API_URL/pushes" -u "$PB_API_KEY": -X DELETE)
-		if [ ! "$curlres" == '{}' ]; then
-			echo "something went wrong"
-			exit 1
-		fi
+		checkCurlOutput "$curlres"
 		;;
 	*)
-		echo "deleting only $2"
+		echo "deleting $2"
 		curlres=$(curl -s "$API_URL/pushes/$2" -u "$PB_API_KEY": -X DELETE)
-		if [ ! "$curlres" == '{}' ]; then
-			echo "something went wrong"
-			exit 1
-		fi
+		checkCurlOutput "$curlres"
 		;;
 	esac
-        ;;
+		;;
 push)
 	if [ -z "$2" ]; then
 		printUsage
 	fi
 	curlres=$(curl -s "$API_URL/devices" -u "$PB_API_KEY":)
 	devices=$(echo "$curlres" | tr '{' '\n' | tr ',' '\n' | grep nickname | cut -d'"' -f4)
-	idens=$(echo "$curlres" | tr '{' '\n' | grep active\"\:true |  tr ',' '\n' | grep iden | cut -d'"' -f4)
+	idens=$(echo "$curlres" | tr '{' '\n' | grep active\"\:true | tr ',' '\n' | grep iden | cut -d'"' -f4)
 	lineNum=$(echo "$devices" | grep -i -n "$2" | cut -d: -f1)
 	dev_id=$(echo "$idens" | sed -n $lineNum'p')
 
