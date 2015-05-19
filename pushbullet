@@ -144,8 +144,13 @@ push)
 		fi
 		if [ "$2" = "all" ]; then
 			curlres=$(curl -s "$API_URL/pushes" -u "$PB_API_KEY": -d type=note -d title="$4" --data-urlencode body="$body" -X POST)
+		# $2 must be a contact/an email address if it contains an @.
 		elif [[ "$2" == *@* ]]; then
 			curlres=$(curl -s "$API_URL/pushes" -u "$PB_API_KEY": -d email="$2" -d type=note -d title="$4" --data-urlencode body="$body" -X POST)
+		# $2 must be a channel_tag if $lineNum is empty.
+		elif [ -z "$lineNum" ]; then
+			curlres=$(curl -s "$API_URL/pushes" -u "$PB_API_KEY": -d channel_tag="$2" -d type=note -d title="$4" --data-urlencode body="$body" -X POST)
+		# in all other cases $2 must be the identifier of a device.
 		else
 			curlres=$(curl -s "$API_URL/pushes" -u "$PB_API_KEY": -d device_iden="$dev_id" -d type=note -d title="$4" --data-urlencode body="$body" -X POST)
 		fi
