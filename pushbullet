@@ -28,6 +28,7 @@ push - Pushes data to a device. (the device name can simply be a unique part of
        the name that \"list\" returns)
 pushes active - Get your 'active' pushes (pushes that haven't been deleted) 
 delete $iden - Deletes a push, you must give the push 'iden', see https://docs.pushbullet.com/v2/pushes/
+delete old $number - Deletes all pushes except the last $number
 delete all - Deletes all pushes
 
 Types: 
@@ -108,6 +109,22 @@ delete)
 			echo "something went wrong"
 			exit 1
 		fi
+		;;
+	old)
+		if [ "$3" == "" ]; then	printUsage; fi
+		echo "deleting all pushes except the last $3"
+		number=$(($3+1))
+		allpushes=$(curl -s "$API_URL/pushes?active=true" -u "$PB_API_KEY": | "$PROGDIR"/JSON.sh -l)
+		activepushes=$(echo "$allpushes" | egrep "\[\"pushes\",[0-9]+,\"active\"\].*true"|while read line; do echo "$line"|cut -f 2 -d ,; done | tail -n "+$number")
+		for id in $activepushes; do
+			iden=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"iden\"\]"|cut -f 2 | cut -d'"' -f 2)
+			echo "Deleting \"$iden\""
+	 		curlres=$(curl -s "$API_URL/pushes/$iden" -u "$PB_API_KEY": -X DELETE)
+			if [ ! "$curlres" == '{}' ]; then
+				echo "something went wrong"
+				exit 1
+			fi
+		done
 		;;
 	*)
 		echo "deleting only $2"
