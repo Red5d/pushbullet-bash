@@ -33,6 +33,7 @@ push - Push data to a device or contact. (the device name can simply be
        a unique part of the name that \"list\" returns)
 pushes active - List your 'active' pushes (pushes that haven't been deleted).
 delete \$iden - Delete a specific push.
+delete except \$number - Delete all pushes except the last \$number.
 delete all - Delete all pushes.
 
 Types: 
@@ -112,6 +113,20 @@ delete)
 		echo "deleting all pushes"
 		curlres=$(curl -s "$API_URL/pushes" -u "$PB_API_KEY": -X DELETE)
 		checkCurlOutput "$curlres"
+		;;
+	except)
+		# test if $3 is not empty and a number
+		if [ -z "${3##*[!0-9]}" ]; then
+		printUsage
+		fi
+		echo "deleting all pushes except the last $3"
+		number=$(($3+1))
+		allpushes=$(curl -s "$API_URL/pushes?active=true" -u "$PB_API_KEY": | "$PROGDIR"/JSON.sh -l)
+		activepushes=$(echo "$allpushes" | egrep "\[\"pushes\",[0-9]+,\"active\"\].*true"|while read line; do echo "$line"|cut -f 2 -d ,; done | tail -n "+$number")
+		for id in $activepushes; do
+			iden=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"iden\"\]"|cut -f 2 | cut -d'"' -f 2)
+			$0 delete $iden
+		done
 		;;
 	*)
 		echo "deleting $2"
