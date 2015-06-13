@@ -35,6 +35,7 @@ pushes active - List your 'active' pushes (pushes that haven't been deleted).
 delete \$iden - Delete a specific push.
 delete except \$number - Delete all pushes except the last \$number.
 delete all - Delete all pushes.
+setup - Use OAuth to retrieve a PushBullet API key for pushbullet-bash.
 
 Types: 
 note
@@ -240,7 +241,23 @@ push)
 	;;
 	esac
 ;;
+setup)
+	CLIENT_ID=u1DAx9KcrmMRUjhcMb3qWOZluwE2MjKa
+	REDIRECT_URI="https%3A%2F%2Ffbartels.github.io%2Fpushbullet-bash"
+	OAUTH_URL="https://www.pushbullet.com/authorize?client_id=$CLIENT_ID&redirect_uri=$REDIRECT_URI&response_type=token&scope=everything"
+	echo
+	echo "Please open the following URL manually if it did not open automatically:"
+	echo
+	echo "$OAUTH_URL"
+	echo
+	echo "Before continuing you need to save your newly created token in $PB_CONFIG"
 
+	if [ "$(uname)" == "Darwin" ]; then
+		open "$OAUTH_URL"
+	else
+		xdg-open "$OAUTH_URL" > /dev/null
+	fi
+;;
 *)
 	printUsage
 	;;
