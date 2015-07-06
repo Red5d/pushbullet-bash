@@ -1,19 +1,24 @@
 #! /bin/bash
 
 # Bash interface to the PushBullet api.
-
 # Author: Red5d - https://github.com/Red5d
-
-
-if [ ! -n "$PB_CONFIG" ]; then
-	PB_CONFIG=~/.config/pushbullet
-fi
-source $PB_CONFIG > /dev/null 2>&1
 
 API_URL=https://api.pushbullet.com/v2
 PROGDIR="$(cd "$( dirname "$0" )" && pwd )"
 
-if [ -z "$PB_API_KEY" ]; then
+if [ ! $(which curl) ]; then
+	echo "pushbullet-bash requires curl to run. Please install curl"
+	exit 1
+fi
+
+# override default PB_CONFIG if different file or API key has been given
+if [[ ! -n "$PB_CONFIG" ]] && [[ ! -n "$PB_API_KEY" ]]; then
+	PB_CONFIG=~/.config/pushbullet
+fi
+source $PB_CONFIG > /dev/null 2>&1
+
+# don't give warning when script is called with setup option
+if [[ -z "$PB_API_KEY" ]] && [[ "$1" != "setup" ]]; then
 	echo -e "\e[0;33mWarning, your API key is not set.\nPlease create \"$PB_CONFIG\" with a line starting with PB_API_KEY= and your PushBullet key\e[00m"
 	exit 1
 fi
