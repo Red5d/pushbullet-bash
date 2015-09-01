@@ -255,7 +255,7 @@ setup)
 	if [ "$(uname)" == "Darwin" ]; then
 		open "$OAUTH_URL"
 	else
-		xdg-open "$OAUTH_URL" > /dev/null
+		xdg-open "$OAUTH_URL" &> /dev/null
 	fi
 ;;
 *)
