@@ -234,6 +234,8 @@ push)
 	link)
 		if [ "$2" = "all" ]; then
 			curlres=$(curl -s "$API_URL/pushes" -u "$PB_API_KEY": -d type=link -d title="$4" -d url="$5" -d body="$6" -X POST)
+		elif [[ "$2" == *@* ]]; then
+			curlres=$(curl -s "$API_URL/pushes" -u "$PB_API_KEY": -d email="$2" -d type=link -d title="$4" -d url="$5" -d body="$6" -X POST)
 		else
 			curlres=$(curl -s "$API_URL/pushes" -u "$PB_API_KEY": -d device_iden="$dev_id" -d type=link -d title="$4" -d url="$5" -d body="$6" -X POST)
 		fi
