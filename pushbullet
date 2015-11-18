@@ -152,22 +152,25 @@ push)
 		body="$5"
 	fi
 
+	# replace newlines with an escape sequence
+	body="${body//$'\n'/\n}"
+
 	case $3 in
 	note)
 		type=note
-		title=$4
-		body=$body
+		title="$4"
+		body="$body"
 		json="{\"type\":\"$type\",\"title\":\"$title\",\"body\":\"$body\""
 	;;
 	link)
 		type=link
-		title=$4
-		body=$body
+		title="$4"
+		body="$body"
 		if [[ $5 == http://* ]] || [[ $5 == https://* ]]; then
 			body=""
-			url=$5
+			url="$5"
 		else
-			url=$6
+			url="$6"
 		fi
 		if [[ ! $url == http://* ]] && [[ ! $url == https://* ]]; then
 			echo "Error: A valid link has to start with http:// or https://"
@@ -183,7 +186,7 @@ push)
 		curlres2=$(curl -s -i -X POST $(echo $curlres | "$PROGDIR"/JSON.sh -b | grep upload_url |awk -F\" '{print $(NF-1)}') -F file=@$4)
 
 		type=file
-		body=$body
+		body="$body"
 		file_name=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_name |awk -F\" '{print $(NF-1)}')
 		file_type=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_type |awk -F\" '{print $(NF-1)}')
 		file_url=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_url |awk -F\" '{print $(NF-1)}')
