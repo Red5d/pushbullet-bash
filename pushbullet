@@ -45,7 +45,7 @@ file
 Type Parameters: 
 (all parameters must be put inside quotes if more than one word)
 \"note\" type: 	give the title and an optional message body.
-\"link\" type: 	give the title of the link, then the url and an optional message body.
+\"link\" type: 	give the title of the link, an optional message and the url.
 \"file\" type: 	give the path to the file and an optional message body.
 Hint:  The message body can also be given via stdin, leaving the message parameter empty.
 "
@@ -141,6 +141,7 @@ push)
 	lineNum=$(echo "$devices" | grep -i -n "$2" | cut -d: -f1)
 	dev_id=$(echo "$idens" | sed -n $lineNum'p')
 
+	title="$4"
 	body=""
 	if [ ! -t 0 ]; then
 		# we have something on stdin
@@ -148,8 +149,12 @@ push)
 		# remove unprintable characters, or pushbullet API fails
 		body=$(echo "$body"|tr -dc '[:print:]\n')
 	fi
-	if [ ! -z "$5" ]; then
+
+	if [[ $5 == http://* ]] || [[ $5 == https://* ]]; then
+		url="$5"
+	else
 		body="$5"
+		url="$6"
 	fi
 
 	# replace newlines with an escape sequence
@@ -158,20 +163,10 @@ push)
 	case $3 in
 	note)
 		type=note
-		title="$4"
-		body="$body"
 		json="{\"type\":\"$type\",\"title\":\"$title\",\"body\":\"$body\""
 	;;
 	link)
 		type=link
-		title="$4"
-		body="$body"
-		if [[ $5 == http://* ]] || [[ $5 == https://* ]]; then
-			body=""
-			url="$5"
-		else
-			url="$6"
-		fi
 		if [[ ! $url == http://* ]] && [[ ! $url == https://* ]]; then
 			echo "Error: A valid link has to start with http:// or https://"
 			exit 1
@@ -179,6 +174,10 @@ push)
 		json="{\"type\":\"$type\",\"title\":\"$title\",\"body\":\"$body\",\"url\":\"$url\""
 	;;
 	file)
+		if [[ -z $4 ]] || [[ ! -f $4 ]]; then
+			echo "Error: no valid file to push was specified"
+			exit 1
+		fi
 		# Api docs: https://docs.pushbullet.com/v2/upload-request/
 		mimetype=$(file -i -b $4)
 		curlres=$(curl -s "$API_URL/upload-request" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" \
@@ -186,7 +185,6 @@ push)
 		curlres2=$(curl -s -i -X POST $(echo $curlres | "$PROGDIR"/JSON.sh -b | grep upload_url |awk -F\" '{print $(NF-1)}') -F file=@$4)
 
 		type=file
-		body="$body"
 		file_name=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_name |awk -F\" '{print $(NF-1)}')
 		file_type=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_type |awk -F\" '{print $(NF-1)}')
 		file_url=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_url |awk -F\" '{print $(NF-1)}')
