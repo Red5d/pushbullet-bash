@@ -153,7 +153,7 @@ push)
 	if [[ $5 == http://* ]] || [[ $5 == https://* ]]; then
 		url="$5"
 	else
-		body="$5"
+		body=${body:-$5}
 		url="$6"
 	fi
 
