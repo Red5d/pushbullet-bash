@@ -158,7 +158,7 @@ push)
 	fi
 
 	# replace newlines with an escape sequence
-	body="${body//$'\n'/\n}"
+	body="${body//$'\n'/\\n}"
 
 	case $3 in
 	note)
