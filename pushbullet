@@ -44,8 +44,8 @@ file
 
 Type Parameters: 
 (all parameters must be put inside quotes if more than one word)
-\"note\" type: 	give the title and an optional message body.
-\"link\" type: 	give the title of the link, an optional message and the url.
+\"note\" type: 	give a title and an optional message body.
+\"link\" type: 	give an optional title of the link, an optional message, and the url.
 \"file\" type: 	give the path to the file and an optional message body.
 Hint:  The message body can also be given via stdin, leaving the message parameter empty.
 "
@@ -150,7 +150,11 @@ push)
 		body=$(echo "$body"|tr -dc '[:print:]\n')
 	fi
 
-	if [[ $5 == http://* ]] || [[ $5 == https://* ]]; then
+	if [[ $4 == http://* ]] || [[ $4 == https://* ]]; then
+		body=${body:-$5}
+		url="$4"
+	elif [[ $5 == http://* ]] || [[ $5 == https://* ]]; then
+		body=${body:-$6}
 		url="$5"
 	else
 		body=${body:-$5}
