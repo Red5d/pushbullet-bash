@@ -5,9 +5,25 @@
 
 API_URL=https://api.pushbullet.com/v2
 PROGDIR="$(cd "$( dirname "$0" )" && pwd )"
+unset QUIET
+
+info() {
+	if [[ -z ${QUIET} ]]; then
+		echo $@
+	fi
+}
+
+err() {
+	if [[ -w /dev/stderr ]]; then
+		echo $@ > /dev/stderr
+	else
+		# /dev/stderr does not exist or is not writable
+		echo $@
+	fi
+}
 
 if [ ! $(which curl) ]; then
-	echo "pushbullet-bash requires curl to run. Please install curl"
+	err "pushbullet-bash requires curl to run. Please install curl"
 	exit 1
 fi
 
@@ -19,12 +35,16 @@ source $PB_CONFIG > /dev/null 2>&1
 
 # don't give warning when script is called with setup option
 if [[ -z "$PB_API_KEY" ]] && [[ "$1" != "setup" ]]; then
-	echo -e "\e[0;33mWarning, your API key is not set.\nPlease create \"$PB_CONFIG\" with a line starting with PB_API_KEY= and your PushBullet key\e[00m"
+	err -e "\e[0;33mWarning, your API key is not set.\nPlease create \"$PB_CONFIG\" with a line starting with PB_API_KEY= and your PushBullet key\e[00m"
 	exit 1
 fi
 
 printUsage() {
-echo "Usage: pushbullet <action> <device> <type> <data>
+echo "Usage: pushbullet [-q|--quiet|-d|--debug] <action> <device> <type> <data>
+
+Options:
+-q, --quiet - only print error messages.
+-d, --debug - print debug output
 
 Actions:
 list - List all devices and contacts in your PushBullet account. (does not require
@@ -37,12 +57,12 @@ delete except \$number - Delete all pushes except the last \$number.
 delete all - Delete all pushes.
 setup - Use OAuth to retrieve a PushBullet API key for pushbullet-bash.
 
-Types: 
+Types:
 note
 link
 file
 
-Type Parameters: 
+Type Parameters:
 (all parameters must be put inside quotes if more than one word)
 \"note\" type: 	give the title and an optional message body.
 \"link\" type: 	give an optional title of the link, an optional message, and the url.
@@ -68,14 +88,27 @@ function getactivepushes () {
 checkCurlOutput() {
 	res=$(echo "$1" | grep -o "created" | tail -n1)
 	if [[ "$1" == *"The param 'channel_tag' has an invalid value."* ]] && [[ "$1" == *"The param 'device_iden' has an invalid value."* ]]; then
-		echo "Error: You specified an unknown device or channel."
+		err "Error: You specified an unknown device or channel."
+		exit 1
+	elif [[ "$1" == *"invalid_access_token"* ]]; then
+		err "Access token is missing or invalid."
 		exit 1
 	elif [[ "$res" != "created" ]] && [[ ! "$1" == "{}" ]]; then
-		echo "Error submitting the request. The error message was:" $1
+		err "Error submitting the request. The error message was:" $1
 		exit 1
 	fi
-	echo "Success"
 }
+
+case $1 in
+-q|--quiet)
+	QUIET=1
+	shift
+	;;
+-d|--debug)
+	set -x
+	shift
+	;;
+esac
 
 case $1 in
 list)
@@ -106,7 +139,7 @@ delete)
 		printUsage
 		;;
 	all)
-		echo "deleting all pushes"
+		info "deleting all pushes"
 		curlres=$(curl -s "$API_URL/pushes" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" -X DELETE)
 		checkCurlOutput "$curlres"
 		;;
@@ -115,17 +148,18 @@ delete)
 		if [ -z "${3##*[!0-9]}" ]; then
 			printUsage
 		fi
-		echo "deleting all pushes except the last $3"
+		info "deleting all pushes except the last $3"
 		number=$(($3+1))
 		allpushes=$(curl -s "$API_URL/pushes?active=true" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" | "$PROGDIR"/JSON.sh -l)
 		activepushes=$(echo "$allpushes" | egrep "\[\"pushes\",[0-9]+,\"active\"\].*true"|while read line; do echo "$line"|cut -f 2 -d ,; done | tail -n "+$number")
 		for id in $activepushes; do
 			iden=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"iden\"\]"|cut -f 2 | cut -d'"' -f 2)
+			# call pushbullet-bash itself to delete the pushes
 			$0 delete $iden
 		done
 		;;
 	*)
-		echo "deleting $2"
+		info "deleting $2"
 		curlres=$(curl -s "$API_URL/pushes/$2" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" -X DELETE)
 		checkCurlOutput "$curlres"
 		;;
@@ -172,7 +206,7 @@ push)
 	link)
 		type=link
 		if [[ ! $url == http://* ]] && [[ ! $url == https://* ]]; then
-			echo "Error: A valid link has to start with http:// or https://"
+			err "Error: A valid link has to start with http:// or https://"
 			exit 1
 		fi
 		json="{\"type\":\"$type\",\"title\":\"$title\",\"body\":\"$body\",\"url\":\"$url\""
@@ -200,34 +234,34 @@ push)
 	esac
 
 	if [ "$2" = "all" ]; then
-		echo "Sending to All Devices"
+		info "Sending to All Devices"
 		json="$json}"
 	# $2 must be a contact/an email address if it contains an @.
 	elif [[ "$2" == *@* ]]; then
-		echo "Sending to email address $2"
+		info "Sending to email address $2"
 		json="$json,\"email\":\"$2\"}"
 	# $2 must be a channel_tag if $lineNum is empty.
 	elif [ -z "$lineNum" ]; then
-		echo "Sending to channel $2"
+		info "Sending to channel $2"
 		json="$json,\"channel_tag\":\"$2\"}"
 	# in all other cases $2 must be the identifier of a device.
 	else
-		echo "Sending to device $2"
+		info "Sending to device $2"
 		json="$json,\"device_iden\":\"$dev_id\"}"
 	fi
 	curlres=$(curl -s "$API_URL/pushes" -H "Access-Token: $PB_API_KEY" -H "Content-type: application/json" --data-binary "$json" -X POST)
 	checkCurlOutput "$curlres"
 ;;
 setup)
-	CLIENT_ID=u1DAx9KcrmMRUjhcMb3qWOZluwE2MjKa
-	REDIRECT_URI="https%3A%2F%2Ffbartels.github.io%2Fpushbullet-bash"
+	CLIENT_ID=RP56dyRen86HaaLnXBevnrDTHT8fTcr6
+	REDIRECT_URI="https://Red5d.github.io/pushbullet-bash"
 	OAUTH_URL="https://www.pushbullet.com/authorize?client_id=$CLIENT_ID&redirect_uri=$REDIRECT_URI&response_type=token&scope=everything"
-	echo
-	echo "Please open the following URL manually if it did not open automatically:"
-	echo
+	info
+	info "Please open the following URL manually if it did not open automatically:"
+	info
 	echo "$OAUTH_URL"
-	echo
-	echo "Before continuing you need to save your newly created token in $PB_CONFIG"
+	info
+	info "Before continuing you need to save your newly created token in $PB_CONFIG"
 
 	if [ "$(uname)" == "Darwin" ]; then
 		open "$OAUTH_URL"
@@ -237,6 +271,7 @@ setup)
 ;;
 ratelimit)
 	curl -i -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" https://api.pushbullet.com/v2/users/me -sw '%{http_code}'
+	echo
 ;;
 *)
 	printUsage
