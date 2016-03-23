@@ -170,6 +170,7 @@ push)
 		printUsage
 	fi
 	curlres=$(curl -s "$API_URL/devices" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" )
+	checkCurlOutput "$curlres"
 	devices=$(echo "$curlres" | tr '{' '\n' | tr ',' '\n' | grep \"nickname\" | cut -d'"' -f4)
 	idens=$(echo "$curlres" | tr '{' '\n' | grep active\"\:true | tr ',' '\n' | grep iden | cut -d'"' -f4)
 	lineNum=$(echo "$devices" | grep -i -n "$2" | cut -d: -f1)
@@ -181,7 +182,7 @@ push)
 		# we have something on stdin
 		body=$(cat)
 		# remove unprintable characters, or pushbullet API fails
-		body=$(echo "$body"|tr -dc '[:print:]\n')
+		body=$(echo "$body"|tr -dc '[:print:]\n'|tr '"' "'")
 	fi
 
 	if [[ $4 == http://* ]] || [[ $4 == https://* ]]; then
