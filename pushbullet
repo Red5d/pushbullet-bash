@@ -52,9 +52,13 @@ list - List all devices and contacts in your PushBullet account. (does not requi
 push - Push data to a device or contact. (the device name can simply be
        a unique part of the name that \"list\" returns)
 pushes active - List your 'active' pushes (pushes that haven't been deleted).
+       Format is: iden:type:title:modified
+pushes recent - List all of your 'active' pushes since the last run.
+pushes last24h - List 'active' pushes from the last 24 hours.
 delete \$iden - Delete a specific push.
 delete except \$number - Delete all pushes except the last \$number.
 delete all - Delete all pushes.
+pull \$iden - Display a specific push.
 setup - Use OAuth to retrieve a PushBullet API key for pushbullet-bash.
 
 Types:
@@ -128,6 +132,22 @@ pushes)
 		echo "------------------"
 		curl -s "$API_URL/pushes?active=true" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" | getactivepushes
 		;;
+	recent)
+		# set LASTMODIFIED (unix time) to zero if empty
+		if [ -z "$PB_LASTMODIFIED" ]; then
+			PB_LASTMODIFIED=0
+			echo "PB_LASTMODIFIED=0" >> $PB_CONFIG
+		fi
+		echo "Your recent pushes:"
+		echo "------------------"
+		curl -s "$API_URL/pushes?active=true&modified_after=$PB_LASTMODIFIED" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" | getactivepushes
+		sed --follow-symlinks -i "s/^PB_LASTMODIFIED=.*/PB_LASTMODIFIED=$(date +%s)/" $PB_CONFIG
+		;;
+	last24h)
+		echo "Your pushes from the last 24 hours:"
+		echo "------------------"
+		curl -s "$API_URL/pushes?active=true&modified_after=$(date -d "1 day ago" +%s)" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" | getactivepushes
+		;;
 	*)
 		printUsage
 		;;
@@ -164,7 +184,17 @@ delete)
 		checkCurlOutput "$curlres"
 		;;
 	esac
+	;;
+pull)
+	case $2 in
+	"")
+		printUsage
 		;;
+	*)
+		curl -s "$API_URL/pushes/$2" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" | "$PROGDIR"/JSON.sh -b
+		;;
+	esac
+	;;
 push)
 	if [ -z "$2" ]; then
 		printUsage
