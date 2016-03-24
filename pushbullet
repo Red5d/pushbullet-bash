@@ -56,6 +56,7 @@ delete \$iden - Delete a specific push.
 delete except \$number - Delete all pushes except the last \$number.
 delete all - Delete all pushes.
 setup - Use OAuth to retrieve a PushBullet API key for pushbullet-bash.
+create-device - create a device in pushbullet named like the current hostname.
 
 Types:
 note
@@ -111,6 +112,17 @@ case $1 in
 esac
 
 case $1 in
+create-device)
+	# create a device in pushbullet named like the current hostname
+	if [ ! -z $($0 list | grep -Fx $(hostname)) ]; then
+		err "A device already exists with your hostname"
+		exit 1
+	fi
+	curlres=$(curl -s "$API_URL/devices" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" \
+	--data-binary "{\"nickname\":\"$(hostname)\",\"model\":\"Created by pushbullet-bash\",\"icon\":\"system\"}" -X POST)
+	checkCurlOutput "$curlres"
+	info "Device has been created"
+	;;
 list)
 	echo "Available devices:"
 	echo "------------------"
