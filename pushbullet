@@ -245,15 +245,22 @@ push)
 		json="{\"type\":\"$type\",\"title\":\"$title\",\"body\":\"$body\",\"url\":\"$url\""
 	;;
 	file)
-		if [[ -z $4 ]] || [[ ! -f $4 ]]; then
-			echo "Error: no valid file to push was specified"
+		file=$4
+		if [[ -d $file ]]; then
+			info "Given file is actually a folder, compressing it first"
+			archivename="$(date +%s)"
+			tar cfz /tmp/$archivename.tar.gz "$file"
+			file=/tmp/$archivename.tar.gz
+		fi
+		if [[ -z $file ]] || [[ ! -f $file ]]; then
+			err "Error: no valid file to push was specified"
 			exit 1
 		fi
 		# Api docs: https://docs.pushbullet.com/v2/upload-request/
-		mimetype=$(file -i -b $4)
+		mimetype=$(file -i -b $file)
 		curlres=$(curl -s "$API_URL/upload-request" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" \
-		--data-binary "{\"file_name\":\"$4\",\"file_type\":\"${mimetype%:*}\"}" -X POST)
-		curlres2=$(curl -s -i -X POST $(echo $curlres | "$PROGDIR"/JSON.sh -b | grep upload_url |awk -F\" '{print $(NF-1)}') -F file=@$4)
+		--data-binary "{\"file_name\":\"$file\",\"file_type\":\"${mimetype%:*}\"}" -X POST)
+		curlres2=$(curl -s -i -X POST $(echo $curlres | "$PROGDIR"/JSON.sh -b | grep upload_url |awk -F\" '{print $(NF-1)}') -F file=@$file)
 
 		type=file
 		file_name=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_name |awk -F\" '{print $(NF-1)}')
