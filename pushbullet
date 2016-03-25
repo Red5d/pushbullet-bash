@@ -78,10 +78,12 @@ function getactivepushes () {
 	for id in $activepushes; do
 		iden=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"iden\"\]"|cut -f 2)
 		title=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"title\"\]"|cut -f 2)
+		modified=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"modified\"\]"|cut -f 2)
+		type=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"type\"\]"|cut -f 2)
 		if [[ -z "$title" ]]; then
 			title="(no title)"
 		fi
-		echo "$title $iden"
+		echo "$iden:$type:$title:$modified"
 	done
 }
 
