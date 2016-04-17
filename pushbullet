@@ -9,20 +9,20 @@ unset QUIET
 
 info() {
 	if [[ -z ${QUIET} ]]; then
-		echo $@
+		echo "$@"
 	fi
 }
 
 err() {
 	if [[ -w /dev/stderr ]]; then
-		echo $@ > /dev/stderr
+		echo "$@" > /dev/stderr
 	else
 		# /dev/stderr does not exist or is not writable
-		echo $@
+		echo "$@"
 	fi
 }
 
-if [ ! $(which curl) ]; then
+if [ ! "$(which curl)" ]; then
 	err "pushbullet-bash requires curl to run. Please install curl"
 	exit 1
 fi
@@ -61,6 +61,7 @@ delete all - Delete all pushes.
 pull \$iden - Display a specific push.
 setup - Use OAuth to retrieve a PushBullet API key for pushbullet-bash.
 create-device - create a device in pushbullet named like the current hostname.
+chat device \$email - create a chat with the passed email. Does not send a message.
 
 Types:
 note
@@ -101,9 +102,50 @@ checkCurlOutput() {
 		err "Access token is missing or invalid."
 		exit 1
 	elif [[ "$res" != "created" ]] && [[ ! "$1" == "{}" ]]; then
-		err "Error submitting the request. The error message was:" $1
+		err "Error submitting the request. The error message was:" "$1"
 		exit 1
 	fi
+}
+
+# function prints the cursor function if another page is needed
+checkPagination() {
+	cursor=$(echo "$1" | tr ',' '\n' | grep \"cursor\": | sort -n | cut -d '"' -f4)
+	echo "$cursor"
+}
+
+getChats() {
+	curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+	"$API_URL/chats")
+
+	# check if query needs pagination
+	chats=$curlres
+	until [ -z "$(checkPagination "$curlres")" ]; do
+		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+		--data-urlencode cursor="$(checkPagination "$curlres")" \
+		--get \
+		"$API_URL/chats")
+		devices="$chats $curlres"
+	done
+	echo "$chats"
+}
+
+getDevices() {
+	curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+	"$API_URL/devices")
+
+	# fail early on if token is invalid
+	checkCurlOutput "$curlres"
+
+	# check if query needs pagination
+	devices=$curlres
+	until [ -z "$(checkPagination "$curlres")" ]; do
+		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+		--data-urlencode cursor="$(checkPagination "$curlres")" \
+		--get \
+		"$API_URL/devices")
+		devices="$devices $curlres"
+	done
+	echo "$devices"
 }
 
 case $1 in
@@ -120,31 +162,61 @@ esac
 case $1 in
 create-device)
 	# create a device in pushbullet named like the current hostname
-	if [ ! -z $($0 list | grep -Fx $(hostname)) ]; then
+	if [ ! -z $("$0" list | grep -Fx "$(hostname)") ]; then
 		err "A device already exists with your hostname"
 		exit 1
 	fi
-	curlres=$(curl -s "$API_URL/devices" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" \
-	--data-binary "{\"nickname\":\"$(hostname)\",\"model\":\"Created by pushbullet-bash\",\"icon\":\"system\"}" -X POST)
+	curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+	--header 'Content-Type: application/json' \
+	--data-binary "{\"nickname\":\"$(hostname)\",\"model\":\"Created by pushbullet-bash\",\"icon\":\"system\"}" \
+	--request POST \
+	"$API_URL/devices")
 	checkCurlOutput "$curlres"
 	info "Device has been created"
 	;;
 list)
-	echo "Available devices:"
-	echo "------------------"
-	curl -s "$API_URL/devices" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" | tr ',' '\n' | grep \"nickname\" | sort -n | cut -d '"' -f4
-	echo "all"
-	echo
-	echo "Contacts:"
-	echo "------------------"
-	curl -s "$API_URL/contacts" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" | tr ',' '\n' | grep \"email\" | sort -n | cut -d '"' -f4
+	info "Available devices:"
+	info "------------------"
+	devices=$(getDevices)
+	echo "$devices" | tr ',' '\n' | grep \"nickname\": | sort -n | cut -d '"' -f4
+	info "all"
+	info
+
+	info "Chats/Contacts:"
+	info "------------------"
+	chats=$(getChats)
+	echo "$chats" | tr ',' '\n' | grep \"email\": | cut -d '"' -f4 | sort -n
+	;;
+chat)
+	case $2 in
+	create)
+		# create a chat with the email in $3 so that the address shows up in the list command
+		if [[ ! "$3" == *@* ]]; then
+			err "$3 is no email address"
+			exit 1
+		fi
+		# as long as the object is an email the chat will either be created or already exists
+		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+		--header "Content-Type: application/json" \
+		--data-binary \{\"email\":\"$3\"\} \
+		--request POST \
+		"$API_URL/chats")
+		;;
+	*)
+		printUsage
+		;;
+	esac
 	;;
 pushes)
 	case $2 in
 	active)
-		echo "Your active pushes:"
-		echo "------------------"
-		curl -s "$API_URL/pushes?active=true" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" | getactivepushes
+		info "Your active pushes:"
+		info "------------------"
+		curl --silent --header "Access-Token: $PB_API_KEY" \
+		--data-urlencode active="true" \
+		--get \
+		"$API_URL/pushes" | getactivepushes
+		# pagination
 		;;
 	recent)
 		# set LASTMODIFIED (unix time) to zero if empty
@@ -152,15 +224,26 @@ pushes)
 			PB_LASTMODIFIED=0
 			echo "PB_LASTMODIFIED=0" >> $PB_CONFIG
 		fi
-		echo "Your recent pushes:"
-		echo "------------------"
-		curl -s "$API_URL/pushes?active=true&modified_after=$PB_LASTMODIFIED" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" | getactivepushes
+		info "Your recent pushes:"
+		info "------------------"
+		curl --silent --header "Access-Token: $PB_API_KEY" \
+		--data-urlencode active="true" \
+		--data-urlencode modified_after="$PB_LASTMODIFIED" \
+		--get \
+		"$API_URL/pushes" | getactivepushes
+		# pagination
+		# TODO how to get $modified for the latest (first) entry?
 		sed --follow-symlinks -i "s/^PB_LASTMODIFIED=.*/PB_LASTMODIFIED=$(date +%s)/" $PB_CONFIG
 		;;
 	last24h)
-		echo "Your pushes from the last 24 hours:"
-		echo "------------------"
-		curl -s "$API_URL/pushes?active=true&modified_after=$(date -d "1 day ago" +%s)" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" | getactivepushes
+		info "Your pushes from the last 24 hours:"
+		info "------------------"
+		curl --silent --header "Access-Token: $PB_API_KEY" \
+		--data-urlencode active="true" \
+		--data-urlencode modified_after="$(date -d "1 day ago" +%s)" \
+		--get \
+		"$API_URL/pushes" | getactivepushes
+		# pagination
 		;;
 	*)
 		printUsage
@@ -174,7 +257,9 @@ delete)
 		;;
 	all)
 		info "deleting all pushes"
-		curlres=$(curl -s "$API_URL/pushes" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" -X DELETE)
+		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+		--request DELETE \
+		"$API_URL/pushes")
 		checkCurlOutput "$curlres"
 		;;
 	except)
@@ -184,17 +269,22 @@ delete)
 		fi
 		info "deleting all pushes except the last $3"
 		number=$(($3+1))
-		allpushes=$(curl -s "$API_URL/pushes?active=true" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" | "$PROGDIR"/JSON.sh -l)
+		allpushes=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+		--data-urlencode active="true" \
+		--get \
+		"$API_URL/pushes" | "$PROGDIR"/JSON.sh -l)
 		activepushes=$(echo "$allpushes" | egrep "\[\"pushes\",[0-9]+,\"active\"\].*true"|while read line; do echo "$line"|cut -f 2 -d ,; done | tail -n "+$number")
 		for id in $activepushes; do
 			iden=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"iden\"\]"|cut -f 2 | cut -d'"' -f 2)
 			# call pushbullet-bash itself to delete the pushes
-			$0 delete $iden
+			$0 delete "$iden"
 		done
 		;;
 	*)
 		info "deleting $2"
-		curlres=$(curl -s "$API_URL/pushes/$2" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" -X DELETE)
+		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+		--request DELETE \
+		"$API_URL/pushes/$2")
 		checkCurlOutput "$curlres"
 		;;
 	esac
@@ -205,7 +295,9 @@ pull)
 		printUsage
 		;;
 	*)
-		curl -s "$API_URL/pushes/$2" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" | "$PROGDIR"/JSON.sh -b
+		curl --silent --header "Access-Token: $PB_API_KEY" \
+		--header "Content-Type: application/json" \
+		"$API_URL/pushes/$2" | "$PROGDIR"/JSON.sh -b
 		;;
 	esac
 	;;
@@ -213,12 +305,15 @@ push)
 	if [ -z "$2" ]; then
 		printUsage
 	fi
-	curlres=$(curl -s "$API_URL/devices" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" )
-	checkCurlOutput "$curlres"
+
+	# get device listing
+	curlres=$(getDevices)
+
 	devices=$(echo "$curlres" | tr '{' '\n' | tr ',' '\n' | grep \"nickname\" | cut -d'"' -f4)
 	idens=$(echo "$curlres" | tr '{' '\n' | grep active\"\:true | tr ',' '\n' | grep iden | cut -d'"' -f4)
 	lineNum=$(echo "$devices" | grep -i -n "$2" | cut -d: -f1)
 	dev_id=$(echo "$idens" | sed -n $lineNum'p')
+	dev_name=$(echo "$devices" | sed -n $lineNum'p')
 
 	title="$4"
 	body=""
@@ -261,23 +356,28 @@ push)
 		if [[ -d $file ]]; then
 			info "Given file is actually a folder, compressing it first"
 			archivename="$(date +%s)"
-			tar cfz /tmp/$archivename.tar.gz "$file"
-			file=/tmp/$archivename.tar.gz
+			tar cfz /tmp/"$archivename.tar.gz" "$file"
+			file=/tmp/"$archivename.tar.gz"
 		fi
 		if [[ -z $file ]] || [[ ! -f $file ]]; then
 			err "Error: no valid file to push was specified"
 			exit 1
 		fi
 		# Api docs: https://docs.pushbullet.com/v2/upload-request/
-		mimetype=$(file -i -b $file)
-		curlres=$(curl -s "$API_URL/upload-request" -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" \
-		--data-binary "{\"file_name\":\"$file\",\"file_type\":\"${mimetype%:*}\"}" -X POST)
-		curlres2=$(curl -s -i -X POST $(echo $curlres | "$PROGDIR"/JSON.sh -b | grep upload_url |awk -F\" '{print $(NF-1)}') -F file=@$file)
+		mimetype=$(file -i -b "$file")
+		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+		--header "Content-Type: application/json" \
+		--data-binary "{\"file_name\":\"$file\",\"file_type\":\"${mimetype%:*}\"}" \
+		--request POST \
+		"$API_URL/upload-request")
+		curlres2=$(curl --silent --include --request POST \
+		$(echo "$curlres" | "$PROGDIR"/JSON.sh -b | grep upload_url | awk -F\" '{print $(NF-1)}') \
+		-F file=@"$file")
 
 		type=file
-		file_name=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_name |awk -F\" '{print $(NF-1)}')
-		file_type=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_type |awk -F\" '{print $(NF-1)}')
-		file_url=$(echo $curlres | "$PROGDIR"/JSON.sh -b | grep file_url |awk -F\" '{print $(NF-1)}')
+		file_name=$(echo "$curlres" | "$PROGDIR"/JSON.sh -b | grep file_name |awk -F\" '{print $(NF-1)}')
+		file_type=$(echo "$curlres" | "$PROGDIR"/JSON.sh -b | grep file_type |awk -F\" '{print $(NF-1)}')
+		file_url=$(echo "$curlres" | "$PROGDIR"/JSON.sh -b | grep file_url |awk -F\" '{print $(NF-1)}')
 		json="{\"type\":\"$type\",\"title\":\"$title\",\"body\":\"$body\",\"file_name\":\"$file_name\",\"file_type\":\"$file_type\",\"file_url\":\"$file_url\""
 	;;
 	*)
@@ -292,16 +392,22 @@ push)
 	elif [[ "$2" == *@* ]]; then
 		info "Sending to email address $2"
 		json="$json,\"email\":\"$2\"}"
+		# since it's an email we are also creating a chat
+		$0 chat create "$2"
 	# $2 must be a channel_tag if $lineNum is empty.
 	elif [ -z "$lineNum" ]; then
 		info "Sending to channel $2"
 		json="$json,\"channel_tag\":\"$2\"}"
 	# in all other cases $2 must be the identifier of a device.
 	else
-		info "Sending to device $2"
+		info "Sending to device $dev_name"
 		json="$json,\"device_iden\":\"$dev_id\"}"
 	fi
-	curlres=$(curl -s "$API_URL/pushes" -H "Access-Token: $PB_API_KEY" -H "Content-type: application/json" --data-binary "$json" -X POST)
+	curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+	--header "Content-type: application/json" \
+	--data-binary "$json" \
+	--request POST \
+	"$API_URL/pushes")
 	checkCurlOutput "$curlres"
 ;;
 setup)
@@ -322,7 +428,9 @@ setup)
 	fi
 ;;
 ratelimit)
-	curl -i -H "Access-Token: $PB_API_KEY" -H "Content-Type: application/json" https://api.pushbullet.com/v2/users/me -sw '%{http_code}'
+	curl --header "Access-Token: $PB_API_KEY" \
+	--include \
+	"$API_URL/users/me"
 	echo
 ;;
 *)
