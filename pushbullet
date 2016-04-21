@@ -1,5 +1,8 @@
 #! /bin/bash
 
+# avoid "EXPECTED value GOT EOF" errors when no pushes are returned
+set -e
+
 # Bash interface to the PushBullet api.
 # Author: Red5d - https://github.com/Red5d
 
@@ -79,16 +82,20 @@ exit 1
 }
 
 function getactivepushes () {
-	allpushes=$("$PROGDIR"/JSON.sh -l)
-	activepushes=$(echo "$allpushes" | egrep "\[\"pushes\",[0-9]+,\"active\"\].*true"|while read line; do echo "$line"|cut -f 2 -d ,; done)
+	# first command in a function reads stdin
+	allpushes=$("$PROGDIR"/JSON.sh -b)
+	activepushes=$(echo "$allpushes" | egrep "\"pushes\",[0-9]+,\"active\"\].*true" \
+	| while read line; do id=${line%,*}; echo $id; done)
 	for id in $activepushes; do
-		iden=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"iden\"\]"|cut -f 2)
-		title=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"title\"\]"|cut -f 2)
-		modified=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"modified\"\]"|cut -f 2)
-		type=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"type\"\]"|cut -f 2)
-		if [[ -z "$title" ]]; then
-			title="(no title)"
-		fi
+		# use grep -F to not interpred ] (which is also stored in $id)
+		iden=$(echo "$allpushes" | grep -F "$id,\"iden\"]" |cut -f 2)
+		title=$(echo "$allpushes" | grep -F "$id,\"title\"]"|cut -f 2)
+		modified=$(echo "$allpushes" | grep -F "$id,\"modified\"]" |cut -f 2)
+		type=$(echo "$allpushes" | grep -F "$id,\"type\"]" |cut -f 2)
+
+		# set title if none is stored
+		title=${title:-"(no title)"}
+
 		echo "$iden:$type:$title:$modified"
 	done
 }
@@ -101,6 +108,16 @@ checkCurlOutput() {
 	elif [[ "$1" == *"invalid_access_token"* ]]; then
 		err "Access token is missing or invalid."
 		exit 1
+	elif [[ "$1" == *"Object not found"* ]]; then
+		err "Object not found"
+		exit 1
+	elif [[ "$1" == '{"accounts":[],"blocks":[],"channels":[],"chats":[],"clients":[],"contacts":[],"devices":[],"grants":[],"pushes":[],"profiles":[],"subscriptions":[],"texts":[]}' ]]; then
+		# "empty" response
+		return 0
+	elif [[ "$1" == '{"accounts":[],"blocks":[],"channels":[],"chats":[],"clients":[],"contacts":[],"devices":[],"grants":[],"pushes":[],"profiles":[],"subscriptions":[],"texts":[],"cursor":'* ]]; then
+		# only next cursor, otherwise empty response
+		# suppress error when calling break outside of loop
+		break 2&> /dev/null
 	elif [[ "$res" != "created" ]] && [[ ! "$1" == "{}" ]]; then
 		err "Error submitting the request. The error message was:" "$1"
 		exit 1
@@ -109,7 +126,7 @@ checkCurlOutput() {
 
 # function prints the cursor function if another page is needed
 checkPagination() {
-	cursor=$(echo "$1" | tr ',' '\n' | grep \"cursor\": | sort -n | cut -d '"' -f4)
+	cursor=$(echo "$1" | tr ',' '\n' | grep \"cursor\": | cut -d '"' -f4)
 	echo "$cursor"
 }
 
@@ -146,6 +163,58 @@ getDevices() {
 		devices="$devices $curlres"
 	done
 	echo "$devices"
+}
+
+getPushes() {
+	# function gets a list of pushes (as a json object)
+	local OPTIND
+	while getopts ":a:i:m:" OPTION; do
+		case "$OPTION" in
+		a)
+			active="$OPTARG"
+			;;
+		i)
+			iden="$OPTARG"
+			;;
+		m)
+			modified="$OPTARG"
+			;;
+		esac
+	done
+	shift $((OPTIND-1))
+
+	# default to true to only get active pushes if not set otherwise
+	active=${active:-true}
+
+	# default to 0 to get all pushes if not set otherwise
+	modified=${modified:-0}
+
+	# if $iden is set, add leading slash
+	if [ ! -z "$iden" ]; then
+		iden="/$iden"
+	fi
+
+	curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+	--data-urlencode active="$active" \
+	--data-urlencode modified_after="$modified" \
+	--get \
+	"$API_URL/pushes$iden")
+	checkCurlOutput "$curlres"
+	response="[ $curlres"
+
+	# check if query needs pagination
+	until [ -z "$(checkPagination "$curlres")" ]; do
+		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+		--data-urlencode active="$active" \
+		--data-urlencode modified_after="$modified" \
+		--data-urlencode cursor="$(checkPagination "$curlres")" \
+		--get \
+		"$API_URL/pushes$iden")
+		response="$response, $curlres"
+		# checkCurlOutput will call break once no new pushes are received
+		checkCurlOutput "$curlres"
+	done
+	echo "$response ]"
 }
 
 case $1 in
@@ -212,11 +281,7 @@ pushes)
 	active)
 		info "Your active pushes:"
 		info "------------------"
-		curl --silent --header "Access-Token: $PB_API_KEY" \
-		--data-urlencode active="true" \
-		--get \
-		"$API_URL/pushes" | getactivepushes
-		# pagination
+		getPushes | getactivepushes
 		;;
 	recent)
 		# set LASTMODIFIED (unix time) to zero if empty
@@ -226,24 +291,20 @@ pushes)
 		fi
 		info "Your recent pushes:"
 		info "------------------"
-		curl --silent --header "Access-Token: $PB_API_KEY" \
-		--data-urlencode active="true" \
-		--data-urlencode modified_after="$PB_LASTMODIFIED" \
-		--get \
-		"$API_URL/pushes" | getactivepushes
-		# pagination
-		# TODO how to get $modified for the latest (first) entry?
-		sed --follow-symlinks -i "s/^PB_LASTMODIFIED=.*/PB_LASTMODIFIED=$(date +%s)/" $PB_CONFIG
+		pushes=$(getPushes -m $PB_LASTMODIFIED | getactivepushes)
+		echo "$pushes"
+		# get the modififed timestamp of the newest push
+		pushes=$(echo "$pushes" | head -n 1)
+		modified=${pushes##*:}
+		# only update PB_LASTMODIFIED if $modified has a value
+		if [ ! -z $modified ]; then
+			sed --follow-symlinks -i "s/^PB_LASTMODIFIED=.*/PB_LASTMODIFIED=$modified/" $PB_CONFIG
+		fi
 		;;
 	last24h)
 		info "Your pushes from the last 24 hours:"
 		info "------------------"
-		curl --silent --header "Access-Token: $PB_API_KEY" \
-		--data-urlencode active="true" \
-		--data-urlencode modified_after="$(date -d "1 day ago" +%s)" \
-		--get \
-		"$API_URL/pushes" | getactivepushes
-		# pagination
+		getPushes -m $(date -d "1 day ago" +%s) | getactivepushes
 		;;
 	*)
 		printUsage
@@ -269,16 +330,13 @@ delete)
 		fi
 		info "deleting all pushes except the last $3"
 		number=$(($3+1))
-		allpushes=$(curl --silent --header "Access-Token: $PB_API_KEY" \
-		--data-urlencode active="true" \
-		--get \
-		"$API_URL/pushes" | "$PROGDIR"/JSON.sh -l)
-		activepushes=$(echo "$allpushes" | egrep "\[\"pushes\",[0-9]+,\"active\"\].*true"|while read line; do echo "$line"|cut -f 2 -d ,; done | tail -n "+$number")
-		for id in $activepushes; do
-			iden=$(echo "$allpushes" | grep "^\[\"pushes\",$id,\"iden\"\]"|cut -f 2 | cut -d'"' -f 2)
+		while read line; do
+			iden=${line%%:*}
 			# call pushbullet-bash itself to delete the pushes
-			$0 delete "$iden"
-		done
+			# use tr to remove quotes around iden
+			$0 delete $(echo "$iden" | tr -d '"')
+		# pushes are always displayed with the newest first. By tailing the output we skip the newest $number
+		done < <(getPushes | getactivepushes | tail -n "+$number")
 		;;
 	*)
 		info "deleting $2"
@@ -295,9 +353,7 @@ pull)
 		printUsage
 		;;
 	*)
-		curl --silent --header "Access-Token: $PB_API_KEY" \
-		--header "Content-Type: application/json" \
-		"$API_URL/pushes/$2" | "$PROGDIR"/JSON.sh -b
+		getPushes -i $2 | "$PROGDIR"/JSON.sh -b
 		;;
 	esac
 	;;
