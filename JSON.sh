@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
-throw () {
+throw() {
   echo "$*" >&2
   exit 1
 }
@@ -8,14 +8,18 @@ throw () {
 BRIEF=0
 LEAFONLY=0
 PRUNE=0
+NO_HEAD=0
+NORMALIZE_SOLIDUS=0
 
 usage() {
   echo
-  echo "Usage: JSON.sh [-b] [-l] [-p] [-h]"
+  echo "Usage: JSON.sh [-b] [-l] [-p] [-s] [-h]"
   echo
   echo "-p - Prune empty. Exclude fields with empty values."
   echo "-l - Leaf only. Only show leaf nodes, which stops data duplication."
   echo "-b - Brief. Combines 'Leaf only' and 'Prune empty' options."
+  echo "-n - No-head. Do not show nodes that have no path (lines that start with [])."
+  echo "-s - Remove escaping of the solidus symbol (stright slash)."
   echo "-h - This help text."
   echo
 }
@@ -23,7 +27,7 @@ usage() {
 parse_options() {
   set -- "$@"
   local ARGN=$#
-  while [ $ARGN -ne 0 ]
+  while [ "$ARGN" -ne 0 ]
   do
     case $1 in
       -h) usage
@@ -36,6 +40,10 @@ parse_options() {
       -l) LEAFONLY=1
       ;;
       -p) PRUNE=1
+      ;;
+      -n) NO_HEAD=1
+      ;;
+      -s) NORMALIZE_SOLIDUS=1
       ;;
       ?*) echo "ERROR: Unknown option."
           usage
@@ -57,7 +65,7 @@ awk_egrep () {
       print token;
       $0=substr($0, start+RLENGTH);
     }
-  }' pattern=$pattern_string
+  }' pattern="$pattern_string"
 }
 
 tokenize () {
@@ -65,14 +73,14 @@ tokenize () {
   local ESCAPE
   local CHAR
 
-  if echo "test string" | egrep -ao --color=never "test" &>/dev/null
+  if echo "test string" | egrep -ao --color=never "test" >/dev/null 2>&1
   then
     GREP='egrep -ao --color=never'
   else
     GREP='egrep -ao'
   fi
 
-  if echo "test string" | egrep -o "test" &>/dev/null
+  if echo "test string" | egrep -o "test" >/dev/null 2>&1
   then
     ESCAPE='(\\[^u[:cntrl:]]|\\u[0-9a-fA-F]{4})'
     CHAR='[^[:cntrl:]"\\]'
@@ -87,7 +95,11 @@ tokenize () {
   local KEYWORD='null|false|true'
   local SPACE='[[:space:]]+'
 
+  # Force zsh to expand $A into multiple words
+  local is_wordsplit_disabled=$(unsetopt 2>/dev/null | grep -c '^shwordsplit$')
+  if [ $is_wordsplit_disabled != 0 ]; then setopt shwordsplit; fi
   $GREP "$STRING|$NUMBER|$KEYWORD|$SPACE|." | egrep -v "^$SPACE$"
+  if [ $is_wordsplit_disabled != 0 ]; then unsetopt shwordsplit; fi
 }
 
 parse_array () {
@@ -112,7 +124,7 @@ parse_array () {
       done
       ;;
   esac
-  [ "$BRIEF" -eq 0 ] && value=`printf '[%s]' "$ary"` || value=
+  [ "$BRIEF" -eq 0 ] && value=$(printf '[%s]' "$ary") || value=
   :
 }
 
@@ -147,7 +159,7 @@ parse_object () {
       done
     ;;
   esac
-  [ "$BRIEF" -eq 0 ] && value=`printf '{%s}' "$obj"` || value=
+  [ "$BRIEF" -eq 0 ] && value=$(printf '{%s}' "$obj") || value=
   :
 }
 
@@ -159,11 +171,15 @@ parse_value () {
     # At this point, the only valid single-character tokens are digits.
     ''|[!0-9]) throw "EXPECTED value GOT ${token:-EOF}" ;;
     *) value=$token
+       # if asked, replace solidus ("\/") in json strings with normalized value: "/"
+       [ "$NORMALIZE_SOLIDUS" -eq 1 ] && value=$(echo "$value" | sed 's#\\/#/#g')
        isleaf=1
        [ "$value" = '""' ] && isempty=1
        ;;
   esac
   [ "$value" = '' ] && return
+  [ "$NO_HEAD" -eq 1 ] && [ -z "$jpath" ] && return
+
   [ "$LEAFONLY" -eq 0 ] && [ "$PRUNE" -eq 0 ] && print=1
   [ "$LEAFONLY" -eq 1 ] && [ "$isleaf" -eq 1 ] && [ $PRUNE -eq 0 ] && print=1
   [ "$LEAFONLY" -eq 0 ] && [ "$PRUNE" -eq 1 ] && [ "$isempty" -eq 0 ] && print=1
@@ -188,3 +204,5 @@ then
   parse_options "$@"
   tokenize | parse
 fi
+
+# vi: expandtab sw=2 ts=2
