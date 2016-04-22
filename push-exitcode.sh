@@ -9,13 +9,13 @@
 pb() {
 	EXITCODE=$?
 
-	if [ ! -z $1 ]; then
+	if [ ! -z "$1" ]; then
 		# when called with arguments execute these
 		START_TIME=$SECONDS
-		eval $*
+		eval "$@"
 		EXITCODE=$?
-		ELAPSED_TIME=$(($SECONDS - $START_TIME))
-		TIME="$(($ELAPSED_TIME / 60)) min $(($ELAPSED_TIME % 60)) sec"
+		ELAPSED_TIME=$((SECONDS - START_TIME))
+		TIME="$((ELAPSED_TIME / 60)) min $((ELAPSED_TIME % 60)) sec"
 	else
 		TIME="duration unknown"
 	fi
