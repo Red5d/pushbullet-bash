@@ -1,0 +1,3 @@
+[submodule "helpers/JSON.sh"]
+	path = helpers/JSON.sh
+	url = https://github.com/dominictarr/JSON.sh.git
