@@ -1,4 +1,4 @@
-#! /bin/bash
+#! /bin/sh
 
 # Bash interface to the PushBullet api.
 # Author: Red5d - https://github.com/Red5d
@@ -21,13 +21,13 @@ ERR_PB_OTHER=213
 CURLOPTS="--silent"
 
 info() {
-	if [[ -z ${QUIET} ]]; then
+	if [ -z "${QUIET}" ]; then
 		echo "$@"
 	fi
 }
 
 err() {
-	if [[ -w /dev/stderr ]]; then
+	if [ -w /dev/stderr ]; then
 		echo "$@" > /dev/stderr
 	else
 		# /dev/stderr does not exist or is not writable
@@ -47,13 +47,14 @@ if [ ! -e "$PROGDIR"/JSON.sh ]; then
 fi
 
 # use default PB_CONFIG if no different file or API key has been given
-if [[ ! -n "$PB_CONFIG" ]] && [[ ! -n "$PB_API_KEY" ]]; then
+if [ ! -n "$PB_CONFIG" ] && [ ! -n "$PB_API_KEY" ]; then
 	PB_CONFIG=~/.config/pushbullet
 fi
-source $PB_CONFIG > /dev/null 2>&1
+echo $PB_CONFIG
+. $PB_CONFIG > /dev/null 2>&1
 
 # don't give warning when script is called with setup option
-if [[ -z "$PB_API_KEY" ]] && [[ "$1" != "setup" ]]; then
+if [ -z "$PB_API_KEY" ] && [ "$1" != "setup" ]; then
 	err -e "\e[0;33mWarning, your API key is not set.\nPlease create \"$PB_CONFIG\" with a line starting with PB_API_KEY= and your PushBullet key\e[00m"
 	exit ${ERR_CFG}
 fi
@@ -100,7 +101,7 @@ Hint:  The message body can also be given via stdin, leaving the message paramet
 exit ${ERR_NONE}
 }
 
-function getactivepushes () {
+getactivepushes () {
 	# first command in a function reads stdin
 	allpushes=$("$PROGDIR"/JSON.sh -b)
 	activepushes=$(echo "$allpushes" | egrep "\"pushes\",[0-9]+,\"active\"\].*true" \
@@ -132,28 +133,44 @@ checkCurlReturnCode() {
 
 checkCurlOutput() {
 	res=$(echo "$1" | grep -o "created" | tail -n1)
-	errcode=${2:-$ERR_UNK}
+	curlretcode=${2:-$ERR_UNK}
 	checkCurlReturnCode "$curlretcode"
-	if [[ "$1" == *"The param 'channel_tag' has an invalid value."* ]] && [[ "$1" == *"The param 'device_iden' has an invalid value."* ]]; then
-		err "Error: You specified an unknown device or channel."
-		exit ${ERR_PB_DEVICE}
-	elif [[ "$1" == *"invalid_access_token"* ]]; then
-		err "Access token is missing or invalid."
-		exit ${ERR_PB_AUTH}
-	elif [[ "$1" == *"Object not found"* ]]; then
-		err "Object not found"
-		exit ${ERR_PB_OBJNOTFOUND}
-	elif [[ "$1" == '{"accounts":[],"blocks":[],"channels":[],"chats":[],"clients":[],"contacts":[],"devices":[],"grants":[],"pushes":[],"profiles":[],"subscriptions":[],"texts":[]}' ]]; then
-		# "empty" response
-		return 0
-	elif [[ "$1" == '{"accounts":[],"blocks":[],"channels":[],"chats":[],"clients":[],"contacts":[],"devices":[],"grants":[],"pushes":[],"profiles":[],"subscriptions":[],"texts":[],"cursor":'* ]]; then
-		# only next cursor, otherwise empty response
-		# suppress error when calling break outside of loop
-		break 2&> /dev/null
-	elif [[ "$res" != "created" ]] && [[ ! "$1" == "{}" ]]; then
-		err "Error submitting the request. The error message was:" "$1"
-		exit ${ERR_PB_OTHER}
-	fi
+	case "$1" in
+		*"The param 'channel_tag' has an invalid value."*)
+			case "$1" in
+				*"The param 'device_iden' has an invalid value."*)
+					err "Error: You specified an unknown device or channel."
+					exit ${ERR_PB_DEVICE}
+					;;
+			esac
+			;;
+
+		*"invalid_access_token"*)
+			err "Access token is missing or invalid."
+			exit ${ERR_PB_AUTH}
+			;;
+		*"Object not found"*)
+			err "Object not found"
+			exit ${ERR_PB_OBJNOTFOUND}
+			;;
+		'{"accounts":[],"blocks":[],"channels":[],"chats":[],"clients":[],"contacts":[],"devices":[],"grants":[],"pushes":[],"profiles":[],"subscriptions":[],"texts":[]}')
+			# "empty" response
+			return 0
+			;;
+		'{"accounts":[],"blocks":[],"channels":[],"chats":[],"clients":[],"contacts":[],"devices":[],"grants":[],"pushes":[],"profiles":[],"subscriptions":[],"texts":[],"cursor":'*)
+			# only next cursor, otherwise empty response
+			# suppress error when calling break outside of loop
+			break > /dev/null 2>&1
+			;;
+		'{}')
+			;;
+		*)
+			if [ "$res" != "created" ]; then
+				err "Error submitting the request. The error message was:" "$1"
+				exit ${ERR_PB_OTHER}
+			fi
+			;;
+	esac
 }
 
 # function prints the cursor function if another page is needed
@@ -321,10 +338,12 @@ chat)
 	case $2 in
 	create)
 		# create a chat with the email in $3 so that the address shows up in the list command
-		if [[ ! "$3" == *@* ]]; then
-			err "$3 is no email address"
-			exit ${ERR_FMT}
-		fi
+		case "$2" in
+			*@*)
+				err "'$3' is no email address"
+				exit ${ERR_FMT}
+				;;
+		esac
 		# as long as the object is an email the chat will either be created or already exists
 		set +e
 		curlres=$(curl $CURLOPTS --header "Access-Token: $PB_API_KEY" \
@@ -398,13 +417,14 @@ delete)
 		fi
 		info "deleting all pushes except the last $3"
 		number=$(($3+1))
-		while read line; do
-			iden=${line%%:*}
-			# call pushbullet-bash itself to delete the pushes
-			# use tr to remove quotes around iden
-			$0 delete $(echo "$iden" | tr -d '"')
-		# pushes are always displayed with the newest first. By tailing the output we skip the newest $number
-		done < <(getPushes | getactivepushes | tail -n "+$number")
+		getPushes | getactivepushes | tail -n "+$number" | \
+			while read line; do
+				iden=${line%%:*}
+				# call pushbullet-bash itself to delete the pushes
+				# use tr to remove quotes around iden
+				$0 delete $(echo "$iden" | tr -d '"')
+			# pushes are always displayed with the newest first. By tailing the output we skip the newest $number
+			done
 		;;
 	*)
 		info "deleting $2"
@@ -451,10 +471,10 @@ push)
 		body=$(echo "$body"|tr -dc '[:print:]\n'|tr '"' "'")
 	fi
 
-	if [[ $4 == http://* ]] || [[ $4 == https://* ]]; then
+	if expr "$4" : 'https\?://*' > /dev/null ; then
 		body=${body:-$5}
 		url="$4"
-	elif [[ $5 == http://* ]] || [[ $5 == https://* ]]; then
+	elif expr "$5" : 'https\?://*' > /dev/null ; then
 		body=${body:-$6}
 		url="$5"
 	else
@@ -463,7 +483,7 @@ push)
 	fi
 
 	# replace newlines with an escape sequence
-	body="${body//$'\n'/\\n}"
+	body=$(printf '%s\n' "$body" | sed 's/\n/\\n/g')
 
 	case $3 in
 	note)
@@ -472,7 +492,7 @@ push)
 	;;
 	link)
 		type=link
-		if [[ ! $url == http://* ]] && [[ ! $url == https://* ]]; then
+		if expr "$url" : 'https\?://*' > /dev/null ; then
 			err "Error: A valid link has to start with http:// or https://"
 			exit ${ERR_FMT}
 		fi
@@ -480,13 +500,13 @@ push)
 	;;
 	file)
 		file=$4
-		if [[ -d $file ]]; then
+		if [ -d $file ]; then
 			info "Given file is actually a folder, compressing it first"
 			archivename="$(date +%s)"
 			tar cfz /tmp/"$archivename.tar.gz" "$file"
 			file=/tmp/"$archivename.tar.gz"
 		fi
-		if [[ -z $file ]] || [[ ! -f $file ]]; then
+		if [ -z $file ] || [ ! -f $file ]; then
 			err "Error: no valid file to push was specified"
 			exit ${ERR_NOFILE}
 		fi
@@ -522,7 +542,7 @@ push)
 		info "Sending to All Devices"
 		json="$json}"
 	# $2 must be a contact/an email address if it contains an @.
-	elif [[ "$2" == *@* ]]; then
+	elif expr "$2" : '*@*' > /dev/null ; then
 		info "Sending to email address $2"
 		json="$json,\"email\":\"$2\"}"
 		# since it's an email we are also creating a chat
@@ -557,10 +577,10 @@ setup)
 	info
 	info "Before continuing you need to save your newly created token in $PB_CONFIG"
 
-	if [ "$(uname)" == "Darwin" ]; then
+	if expr "$(uname)" : "Darwin" > /dev/null ; then
 		open "$OAUTH_URL"
 	else
-		xdg-open "$OAUTH_URL" &> /dev/null
+		xdg-open "$OAUTH_URL" > /dev/null 2>&1
 	fi
 ;;
 ratelimit)
