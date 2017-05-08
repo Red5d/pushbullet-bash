@@ -7,6 +7,17 @@ API_URL=https://api.pushbullet.com/v2
 PROGDIR="$(cd "$( dirname "$0" )" && pwd )"
 unset QUIET
 
+ERR_NONE=0
+ERR_UNK=200
+ERR_DEP=201
+ERR_CFG=202
+ERR_FMT=203
+ERR_NOFILE=204
+ERR_PB_AUTH=210
+ERR_PB_DEVICE=211
+ERR_PB_OBJNOTFOUND=212
+ERR_PB_OTHER=213
+
 info() {
 	if [[ -z ${QUIET} ]]; then
 		echo "$@"
@@ -24,13 +35,13 @@ err() {
 
 if [ ! "$(which curl)" ]; then
 	err "pushbullet-bash requires curl to run. Please install curl."
-	exit 1
+	exit ${ERR_DEP}
 fi
 
 if [ ! -e "$PROGDIR"/JSON.sh ]; then
 	err "Not all required libraries are installed. Please change into the pushbullet-bash folder and run the following command:"
 	err "git submodule init && git submodule update"
-	exit
+	exit ${ERR_DEP}
 fi
 
 # use default PB_CONFIG if no different file or API key has been given
@@ -42,7 +53,7 @@ source $PB_CONFIG > /dev/null 2>&1
 # don't give warning when script is called with setup option
 if [[ -z "$PB_API_KEY" ]] && [[ "$1" != "setup" ]]; then
 	err -e "\e[0;33mWarning, your API key is not set.\nPlease create \"$PB_CONFIG\" with a line starting with PB_API_KEY= and your PushBullet key\e[00m"
-	exit 1
+	exit ${ERR_CFG}
 fi
 
 # from here on set -e to avoid "EXPECTED value GOT EOF" errors from JSON.sh when no pushes are returned
@@ -84,7 +95,7 @@ Type Parameters:
 \"file\" type: 	give the path to the file and an optional message body.
 Hint:  The message body can also be given via stdin, leaving the message parameter empty.
 "
-exit 1
+exit ${ERR_NONE}
 }
 
 function getactivepushes () {
@@ -106,17 +117,30 @@ function getactivepushes () {
 	done
 }
 
+checkCurlReturnCode() {
+	errcode=${1:-$ERR_UNK}
+	if [ "${errcode}" = "${ERR_UNK}" ]; then
+		err "Unknown error (${errcode})"
+		exit ${errcode}
+	elif [ "${1}" != "0" ]; then
+		err "Unknown error from curl (${1})"
+		exit ${1}
+	fi
+}
+
 checkCurlOutput() {
 	res=$(echo "$1" | grep -o "created" | tail -n1)
+	errcode=${2:-$ERR_UNK}
+	checkCurlReturnCode "$curlretcode"
 	if [[ "$1" == *"The param 'channel_tag' has an invalid value."* ]] && [[ "$1" == *"The param 'device_iden' has an invalid value."* ]]; then
 		err "Error: You specified an unknown device or channel."
-		exit 1
+		exit ${ERR_PB_DEVICE}
 	elif [[ "$1" == *"invalid_access_token"* ]]; then
 		err "Access token is missing or invalid."
-		exit 1
+		exit ${ERR_PB_AUTH}
 	elif [[ "$1" == *"Object not found"* ]]; then
 		err "Object not found"
-		exit 1
+		exit ${ERR_PB_OBJNOTFOUND}
 	elif [[ "$1" == '{"accounts":[],"blocks":[],"channels":[],"chats":[],"clients":[],"contacts":[],"devices":[],"grants":[],"pushes":[],"profiles":[],"subscriptions":[],"texts":[]}' ]]; then
 		# "empty" response
 		return 0
@@ -126,7 +150,7 @@ checkCurlOutput() {
 		break 2&> /dev/null
 	elif [[ "$res" != "created" ]] && [[ ! "$1" == "{}" ]]; then
 		err "Error submitting the request. The error message was:" "$1"
-		exit 1
+		exit ${ERR_PB_OTHER}
 	fi
 }
 
@@ -137,17 +161,25 @@ checkPagination() {
 }
 
 getChats() {
+	set +e
 	curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
 	"$API_URL/chats")
+	curlretcode=$?
+	set -e
+	checkCurlReturnCode "$curlretcode"
 
 	# check if query needs pagination
 	chats=$curlres
 	cursor=$(checkPagination "$curlres")
 	until [ -z $cursor ]; do
+		set +e
 		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
 		--data-urlencode cursor=$cursor \
 		--get \
 		"$API_URL/chats")
+		curlretcode=$?
+		set -e
+		checkCurlReturnCode "$curlretcode"
 		chats="$chats $curlres"
 		cursor=$(checkPagination "$curlres")
 	done
@@ -155,20 +187,27 @@ getChats() {
 }
 
 getDevices() {
+	set +e
 	curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
 	"$API_URL/devices")
+	curlretcode=$?
+	set -e
 
 	# fail early on if token is invalid
-	checkCurlOutput "$curlres"
+	checkCurlOutput "$curlres" "$curlretcode"
 
 	# check if query needs pagination
 	devices=$curlres
 	cursor=$(checkPagination "$curlres")
 	until [ -z $cursor ]; do
+		set +e
 		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
 		--data-urlencode cursor=$cursor \
 		--get \
 		"$API_URL/devices")
+		curlretcode=$?
+		set -e
+		checkCurlReturnCode "$curlretcode"
 		devices="$devices $curlres"
 		cursor=$(checkPagination "$curlres")
 	done
@@ -204,25 +243,31 @@ getPushes() {
 		iden="/$iden"
 	fi
 
+	set +e
 	curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
 	--data-urlencode active="$active" \
 	--data-urlencode modified_after="$modified" \
 	--get \
 	"$API_URL/pushes$iden")
-	checkCurlOutput "$curlres"
+	curlretcode=$?
+	set -e
+	checkCurlOutput "$curlres" "$curlretcode"
 	response="[ $curlres"
 
 	# check if query needs pagination
 	until [ -z "$(checkPagination "$curlres")" ]; do
+		set +e
 		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
 		--data-urlencode active="$active" \
 		--data-urlencode modified_after="$modified" \
 		--data-urlencode cursor="$(checkPagination "$curlres")" \
 		--get \
 		"$API_URL/pushes$iden")
+		curlretcode=$?
+		set -e
 		response="$response, $curlres"
 		# checkCurlOutput will call break once no new pushes are received
-		checkCurlOutput "$curlres"
+		checkCurlOutput "$curlres" "$curlretcode"
 	done
 	echo "$response ]"
 }
@@ -243,14 +288,17 @@ create-device)
 	# create a device in pushbullet named like the current hostname
 	if [ ! -z $("$0" list | grep -Fx "$(hostname)") ]; then
 		err "A device already exists with your hostname"
-		exit 1
+		exit ${ERR_PB_DEVICE}
 	fi
+	set +e
 	curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
 	--header 'Content-Type: application/json' \
 	--data-binary "{\"nickname\":\"$(hostname)\",\"model\":\"Created by pushbullet-bash\",\"icon\":\"system\"}" \
 	--request POST \
 	"$API_URL/devices")
-	checkCurlOutput "$curlres"
+	curlretcode=$?
+	set -e
+	checkCurlOutput "$curlres" "$curlretcode"
 	info "Device has been created"
 	;;
 list)
@@ -272,14 +320,18 @@ chat)
 		# create a chat with the email in $3 so that the address shows up in the list command
 		if [[ ! "$3" == *@* ]]; then
 			err "$3 is no email address"
-			exit 1
+			exit ${ERR_FMT}
 		fi
 		# as long as the object is an email the chat will either be created or already exists
+		set +e
 		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
 		--header "Content-Type: application/json" \
 		--data-binary \{\"email\":\"$3\"\} \
 		--request POST \
 		"$API_URL/chats")
+		curlretcode=$?
+		set -e
+		checkCurlReturnCode "$curlretcode"
 		;;
 	*)
 		printUsage
@@ -328,10 +380,13 @@ delete)
 		;;
 	all)
 		info "deleting all pushes"
+		set +e
 		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
 		--request DELETE \
 		"$API_URL/pushes")
-		checkCurlOutput "$curlres"
+		curlretcode=$?
+		set -e
+		checkCurlOutput "$curlres" "$curlretcode"
 		;;
 	except)
 		# test if $3 is not empty and a number
@@ -350,10 +405,13 @@ delete)
 		;;
 	*)
 		info "deleting $2"
+		set +e
 		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
 		--request DELETE \
 		"$API_URL/pushes/$2")
-		checkCurlOutput "$curlres"
+		curlretcode=$?
+		set -e
+		checkCurlOutput "$curlres" "$curlretcode"
 		;;
 	esac
 	;;
@@ -413,7 +471,7 @@ push)
 		type=link
 		if [[ ! $url == http://* ]] && [[ ! $url == https://* ]]; then
 			err "Error: A valid link has to start with http:// or https://"
-			exit 1
+			exit ${ERR_FMT}
 		fi
 		json="{\"type\":\"$type\",\"title\":\"$title\",\"body\":\"$body\",\"url\":\"$url\""
 	;;
@@ -427,18 +485,24 @@ push)
 		fi
 		if [[ -z $file ]] || [[ ! -f $file ]]; then
 			err "Error: no valid file to push was specified"
-			exit 1
+			exit ${ERR_NOFILE}
 		fi
 		# Api docs: https://docs.pushbullet.com/v2/upload-request/
 		mimetype=$(file -i -b "$file")
+		set +e
 		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
 		--header "Content-Type: application/json" \
 		--data-binary "{\"file_name\":\"$file\",\"file_type\":\"${mimetype%:*}\"}" \
 		--request POST \
 		"$API_URL/upload-request")
+		curlretcode=$?
+		checkCurlReturnCode "$curlretcode"
 		curlres2=$(curl --silent --include --request POST \
 		$(echo "$curlres" | "$PROGDIR"/JSON.sh -b | grep upload_url | awk -F\" '{print $(NF-1)}') \
 		-F file=@"$file")
+		curlretcode=$?
+		set -e
+		checkCurlReturnCode "$curlretcode"
 
 		type=file
 		file_name=$(echo "$curlres" | "$PROGDIR"/JSON.sh -b | grep file_name |awk -F\" '{print $(NF-1)}')
@@ -469,12 +533,15 @@ push)
 		info "Sending to device $dev_name"
 		json="$json,\"device_iden\":\"$dev_id\"}"
 	fi
+	set +e
 	curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
 	--header "Content-type: application/json" \
 	--data-binary "$json" \
 	--request POST \
 	"$API_URL/pushes")
-	checkCurlOutput "$curlres"
+	curlretcode=$?
+	set -e
+	checkCurlOutput "$curlres" "$curlretcode"
 ;;
 setup)
 	CLIENT_ID=RP56dyRen86HaaLnXBevnrDTHT8fTcr6
