@@ -37,7 +37,7 @@ fi
 if [ ! -n "$PB_CONFIG" ] && [ ! -n "$PB_API_KEY" ]; then
 	PB_CONFIG=~/.config/pushbullet
 fi
-echo $PB_CONFIG
+
 . $PB_CONFIG > /dev/null 2>&1
 
 # don't give warning when script is called with setup option
@@ -110,15 +110,10 @@ getactivepushes () {
 checkCurlOutput() {
 	res=$(echo "$1" | grep -o "created" | tail -n1)
 	case "$1" in
-		*"The param 'channel_tag' has an invalid value."*)
-			case "$1" in
-				*"The param 'device_iden' has an invalid value."*)
-					err "Error: You specified an unknown device or channel."
-					exit 1
-					;;
-			esac
+		*"The param 'channel_tag' has an invalid value."* | *"The param 'device_iden' has an invalid value."*)
+			err "Error: You specified an unknown device or channel."
+			exit 1
 			;;
-
 		*"invalid_access_token"*)
 			err "Access token is missing or invalid."
 			exit 1
