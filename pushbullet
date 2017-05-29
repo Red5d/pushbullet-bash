@@ -18,6 +18,8 @@ ERR_PB_DEVICE=211
 ERR_PB_OBJNOTFOUND=212
 ERR_PB_OTHER=213
 
+CURLOPTS="--silent"
+
 info() {
 	if [[ -z ${QUIET} ]]; then
 		echo "$@"
@@ -161,8 +163,10 @@ checkPagination() {
 }
 
 getChats() {
+
 	set +e
-	curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+	curlres=$(curl $CURLOPTS --header "Access-Token: $PB_API_KEY" \
+
 	"$API_URL/chats")
 	curlretcode=$?
 	set -e
@@ -173,7 +177,7 @@ getChats() {
 	cursor=$(checkPagination "$curlres")
 	until [ -z $cursor ]; do
 		set +e
-		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+		curlres=$(curl $CURLOPTS --header "Access-Token: $PB_API_KEY" \
 		--data-urlencode cursor=$cursor \
 		--get \
 		"$API_URL/chats")
@@ -188,7 +192,7 @@ getChats() {
 
 getDevices() {
 	set +e
-	curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+	curlres=$(curl $CURLOPTS --header "Access-Token: $PB_API_KEY" \
 	"$API_URL/devices")
 	curlretcode=$?
 	set -e
@@ -201,7 +205,7 @@ getDevices() {
 	cursor=$(checkPagination "$curlres")
 	until [ -z $cursor ]; do
 		set +e
-		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+		curlres=$(curl $CURLOPTS --header "Access-Token: $PB_API_KEY" \
 		--data-urlencode cursor=$cursor \
 		--get \
 		"$API_URL/devices")
@@ -244,7 +248,7 @@ getPushes() {
 	fi
 
 	set +e
-	curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+	curlres=$(curl $CURLOPTS --header "Access-Token: $PB_API_KEY" \
 	--data-urlencode active="$active" \
 	--data-urlencode modified_after="$modified" \
 	--get \
@@ -257,7 +261,7 @@ getPushes() {
 	# check if query needs pagination
 	until [ -z "$(checkPagination "$curlres")" ]; do
 		set +e
-		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+		curlres=$(curl $CURLOPTS --header "Access-Token: $PB_API_KEY" \
 		--data-urlencode active="$active" \
 		--data-urlencode modified_after="$modified" \
 		--data-urlencode cursor="$(checkPagination "$curlres")" \
@@ -290,8 +294,9 @@ create-device)
 		err "A device already exists with your hostname"
 		exit ${ERR_PB_DEVICE}
 	fi
-	set +e
-	curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+
+  set +e
+	curlres=$(curl $CURLOPTS --header "Access-Token: $PB_API_KEY" \
 	--header 'Content-Type: application/json' \
 	--data-binary "{\"nickname\":\"$(hostname)\",\"model\":\"Created by pushbullet-bash\",\"icon\":\"system\"}" \
 	--request POST \
@@ -324,7 +329,7 @@ chat)
 		fi
 		# as long as the object is an email the chat will either be created or already exists
 		set +e
-		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+		curlres=$(curl $CURLOPTS --header "Access-Token: $PB_API_KEY" \
 		--header "Content-Type: application/json" \
 		--data-binary \{\"email\":\"$3\"\} \
 		--request POST \
@@ -381,7 +386,7 @@ delete)
 	all)
 		info "deleting all pushes"
 		set +e
-		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+		curlres=$(curl $CURLOPTS --header "Access-Token: $PB_API_KEY" \
 		--request DELETE \
 		"$API_URL/pushes")
 		curlretcode=$?
@@ -406,7 +411,7 @@ delete)
 	*)
 		info "deleting $2"
 		set +e
-		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+		curlres=$(curl $CURLOPTS --header "Access-Token: $PB_API_KEY" \
 		--request DELETE \
 		"$API_URL/pushes/$2")
 		curlretcode=$?
@@ -490,14 +495,14 @@ push)
 		# Api docs: https://docs.pushbullet.com/v2/upload-request/
 		mimetype=$(file -i -b "$file")
 		set +e
-		curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+		curlres=$(curl $CURLOPTS --header "Access-Token: $PB_API_KEY" \
 		--header "Content-Type: application/json" \
 		--data-binary "{\"file_name\":\"$file\",\"file_type\":\"${mimetype%:*}\"}" \
 		--request POST \
 		"$API_URL/upload-request")
 		curlretcode=$?
 		checkCurlReturnCode "$curlretcode"
-		curlres2=$(curl --silent --include --request POST \
+		curlres2=$(curl $CURLOPTS --include --request POST \
 		$(echo "$curlres" | "$PROGDIR"/JSON.sh -b | grep upload_url | awk -F\" '{print $(NF-1)}') \
 		-F file=@"$file")
 		curlretcode=$?
@@ -534,7 +539,7 @@ push)
 		json="$json,\"device_iden\":\"$dev_id\"}"
 	fi
 	set +e
-	curlres=$(curl --silent --header "Access-Token: $PB_API_KEY" \
+	curlres=$(curl $CURLOPTS --header "Access-Token: $PB_API_KEY" \
 	--header "Content-type: application/json" \
 	--data-binary "$json" \
 	--request POST \
