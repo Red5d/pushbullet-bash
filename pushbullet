@@ -50,7 +50,6 @@ fi
 if [ ! -n "$PB_CONFIG" ] && [ ! -n "$PB_API_KEY" ]; then
 	PB_CONFIG=~/.config/pushbullet
 fi
-echo $PB_CONFIG
 . $PB_CONFIG > /dev/null 2>&1
 
 # don't give warning when script is called with setup option
