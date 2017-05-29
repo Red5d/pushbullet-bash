@@ -163,10 +163,8 @@ checkPagination() {
 }
 
 getChats() {
-
 	set +e
 	curlres=$(curl $CURLOPTS --header "Access-Token: $PB_API_KEY" \
-
 	"$API_URL/chats")
 	curlretcode=$?
 	set -e
@@ -295,7 +293,7 @@ create-device)
 		exit ${ERR_PB_DEVICE}
 	fi
 
-  set +e
+	set +e
 	curlres=$(curl $CURLOPTS --header "Access-Token: $PB_API_KEY" \
 	--header 'Content-Type: application/json' \
 	--data-binary "{\"nickname\":\"$(hostname)\",\"model\":\"Created by pushbullet-bash\",\"icon\":\"system\"}" \
