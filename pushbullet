@@ -135,15 +135,10 @@ checkCurlOutput() {
 	curlretcode=${2:-$ERR_UNK}
 	checkCurlReturnCode "$curlretcode"
 	case "$1" in
-		*"The param 'channel_tag' has an invalid value."*)
-			case "$1" in
-				*"The param 'device_iden' has an invalid value."*)
-					err "Error: You specified an unknown device or channel."
-					exit ${ERR_PB_DEVICE}
-					;;
-			esac
+		*"The param 'channel_tag' has an invalid value."* | *"The param 'device_iden' has an invalid value."*)
+			err "Error: You specified an unknown device or channel."
+			exit ${ERR_PB_DEVICE}
 			;;
-
 		*"invalid_access_token"*)
 			err "Access token is missing or invalid."
 			exit ${ERR_PB_AUTH}
