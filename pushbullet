@@ -13,12 +13,42 @@ ERR_DEP=201
 ERR_CFG=202
 ERR_FMT=203
 ERR_NOFILE=204
+ERR_NOTANUMBER=205
 ERR_PB_AUTH=210
 ERR_PB_DEVICE=211
 ERR_PB_OBJNOTFOUND=212
 ERR_PB_OTHER=213
+ERR_RETRY_NOTIMES=221
+ERR_RETRY_DELAYTOOSHORT=222
+ERR_RETRY_NOERRORCODES=223
 
 CURLOPTS="--silent"
+
+# Attempt retries, global option that enables all other RETRY* variables
+# Set to anything (e.g., `RETRY=1`) to enable retries.
+unset RETRY
+
+# Comma-delimited (no-whitespace) error codes to trigger a retry; see
+# https://ec.haxx.se/usingcurl-returns.html
+RETRYERRCODES="5,6,7"
+
+# Number of retry attempts *after* the first (failed) attempt;
+# Example: if 'RETRYTIMES=2', then the script will try to connect a
+#   total of 3 times (the first failed attempt plus 2 retries)
+RETRYTIMES=2
+
+# Number of seconds to sleep after a matching failure before retrying.
+RETRYDELAY=60
+
+# Setting RETRYDELAY to 30 seconds or less may be inconsiderate to
+# the API and (if unmonitored) may cause denial-of-service or (more
+# likely) a locked account. Additionally, transient errors may take
+# several minutes to self-resolve. Therefore, setting a delay less
+# than 30 seconds is very likely to fail again, so the script defaults
+# to mandating 30 or more.
+# Set this to anything (e.g., `RETRYSHORTDELAY=1`) to force allowing
+# these short delays.
+unset RETRYSHORTDELAY
 
 info() {
 	if [ -z "${QUIET}" ]; then
@@ -62,11 +92,32 @@ fi
 set -e
 
 printUsage() {
-echo "Usage: pushbullet [-q|--quiet|-d|--debug] <action> <device> <type> <data>
+[ -z "${RETRY}" ] && RETRYNOT="not "
+echo "Usage: pushbullet [-q|--quiet|-d|--debug|[-R|--retry [...]] <action> <device> <type> <data>
 
-Options:
+Global Options:
 -q, --quiet - only print error messages.
 -d, --debug - print debug output
+
+Retry Options: (settings used only if '--retry' specified)
+-R, --retry - retry failed connection attempts, if failure due to curl
+              transient network errors (currently: ${RETRYNOT}enabled)
+-E ERRS, --retry-errors ERRS
+            - comma-delimited error codes that will allow --retry
+              (currently: \"${RETRYERRCODES}\")
+-T INT, --retry-times INT
+            - number of times to retry after the first failed attempt;
+              0 means only once, -1 means non-stop (currently: ${RETRYTIMES}, for a total
+              of $(( RETRYTIMES + 1 )) connection attempts)
+-D INT, --retry-delay INT
+            - pause (in seconds) between retry attempts, 0 means instantly
+              (currently: ${RETRYDELAY}); NOTE: delays under 30 seconds will abort unless
+              '--force-short-delay' is also provided, in order to prevent
+              inadvertent denial-of-service or locking the account
+--force-short-delay
+            - a delay time of less than 30 seconds can be inconsiderate
+              to the foreign API, this option allows the user to set delay
+              times below that threshold
 
 Actions:
 list - List all devices and contacts in your PushBullet account. (does not require
@@ -97,7 +148,11 @@ Type Parameters:
 \"file\" type: 	give the path to the file and an optional message body.
 Hint:  The message body can also be given via stdin, leaving the message parameter empty.
 "
-exit ${ERR_NONE}
+if [ -z "$1" ]; then
+	exit ${ERR_NONE}
+else
+	exit $1
+fi
 }
 
 getactivepushes () {
@@ -290,16 +345,79 @@ getPushes() {
 	echo "$response ]"
 }
 
-case $1 in
--q|--quiet)
-	QUIET=1
-	shift
-	;;
--d|--debug)
-	set -x
-	shift
-	;;
-esac
+asNumber() {
+	NONNUM=$(echo "$1" | tr -d "[:digit:]")
+	if [ -n "${NONNUM}" ]; then
+		err "Expecting a number: '$1'"
+		exit ${ERR_NOTANUMBER}
+	fi
+	echo "$1"
+}
+
+PARSEARGS=1
+while [ -n "${PARSEARGS}" ] && [ "$#" -gt 0 ]; do
+	case $1 in
+	-q|--quiet)
+		QUIET=1
+		;;
+	-d|--debug)
+		set -x
+		;;
+	-R|--retry)
+		RETRY=1
+		;;
+	-E|--retry-errors)
+		shift
+		RETRYERRCODES="$1"
+		;;
+	-T|--retry-times)
+		shift
+		RETRYTIMES=$(asNumber "$1")
+		;;
+	-D|--retry-delay)
+		shift
+		RETRYDELAY=$(asNumber "$1")
+		;;
+	--force-short-delay)
+		RETRYSHORTDELAY=1
+		;;
+	-h|--help)
+		printUsage ${ERR_NONE}
+		;;
+	*)
+		# stop on first non-matching argument, likely the "action"
+		unset PARSEARGS
+		;;
+	esac
+	if [ -n "${PARSEARGS}" ]; then shift ; fi
+done
+
+if [ -n "${RETRY}" ]; then
+	if [ -z "${RETRYTIMES}" ]; then
+		err "Retry 'times' not set or not a number; use something like '--retry-times=2'"
+		exit ${ERR_RETRY_NOTIMES}
+	fi
+
+	if [ -z "${RETRYSHORTDELAY}" -a "${RETRYDELAY}" -lt 30 ]; then
+		err "Retry delay set below 30 seconds; use '--force-short-delay' to bypass this check"
+		exit ${ERR_RETRY_DELAYTOOSHORT}
+	fi
+
+	if [ -z "${RETRYERRCODES}" ]; then
+		err "Retry enabled but no error codes specified; use something like '--retry-errors=\"5,6,7\"'"
+		exit ${ERR_RETRY_NOERRORCODES}
+	fi
+
+	# remove spaces
+	RETRYERRCODES=$( echo "${RETRYERRCODES}" | tr -d "[:blank:]" )
+	# enforce numbers
+	OIFS="${IFS}"
+	IFS=","
+	for num in ${RETRYERRCODES} ; do IGN=$(asNumber "$num") ; done
+	IFS="${OIFS}"
+	# make it easier to parse out error codes later
+	RETRYERRCODES=",${RETRYERRCODES},"
+fi
 
 case $1 in
 create-device)
@@ -589,6 +707,6 @@ ratelimit)
 	echo
 ;;
 *)
-	printUsage
+	printUsage ${ERR_UNK}
 ;;
 esac
