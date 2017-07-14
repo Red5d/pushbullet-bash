@@ -452,7 +452,7 @@ push)
 
 	devices=$(echo "$curlres" | tr '{' '\n' | tr ',' '\n' | grep \"nickname\" | cut -d'"' -f4)
 	idens=$(echo "$curlres" | tr '{' '\n' | grep active\"\:true | tr ',' '\n' | grep iden | cut -d'"' -f4)
-	lineNum=$(echo "$devices" | grep -i -n "$2" | cut -d: -f1)
+	lineNum=$(echo "$devices" | grep -i -m 1 -n "$2" | cut -d: -f1)
 	dev_id=$(echo "$idens" | sed -n $lineNum'p')
 	dev_name=$(echo "$devices" | sed -n $lineNum'p')
 
