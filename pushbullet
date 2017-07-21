@@ -139,6 +139,7 @@ checkCurlOutput() {
 			err "Error: You specified an unknown device or channel."
 			exit ${ERR_PB_DEVICE}
 			;;
+
 		*"invalid_access_token"*)
 			err "Access token is missing or invalid."
 			exit ${ERR_PB_AUTH}
@@ -452,7 +453,15 @@ push)
 
 	devices=$(echo "$curlres" | tr '{' '\n' | tr ',' '\n' | grep \"nickname\" | cut -d'"' -f4)
 	idens=$(echo "$curlres" | tr '{' '\n' | grep active\"\:true | tr ',' '\n' | grep iden | cut -d'"' -f4)
-	lineNum=$(echo "$devices" | grep -i -m 1 -n "$2" | cut -d: -f1)
+	lineNum=$(echo "$devices" | grep -i -n "$2" | cut -d: -f1)
+
+	# check the lenght of $lineNum, if it returns more than one entry then the search was not unique enough
+	lineLength=$(echo $lineNum  | wc -w)
+	if [ $lineLength -gt '1' ]; then
+		err "The given device name is not unique enough. Please check 'pushbullet list'"
+		exit ${ERR_PB_DEVICE}
+	fi
+
 	dev_id=$(echo "$idens" | sed -n $lineNum'p')
 	dev_name=$(echo "$devices" | sed -n $lineNum'p')
 
