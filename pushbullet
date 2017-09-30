@@ -545,7 +545,7 @@ push)
 		info "Sending to All Devices"
 		json="$json}"
 	# $2 must be a contact/an email address if it contains an @.
-	elif expr "$2" : '*@*' > /dev/null ; then
+	elif expr "$2" : '.*@.*' > /dev/null ; then
 		info "Sending to email address $2"
 		json="$json,\"email\":\"$2\"}"
 		# since it's an email we are also creating a chat
