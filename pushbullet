@@ -20,6 +20,8 @@ ERR_PB_OTHER=213
 
 CURLOPTS="--silent"
 
+MULTIPLE_DEVICE_DELIMITER = ":"
+
 info() {
 	if [ -z "${QUIET}" ]; then
 		echo "$@"
@@ -448,126 +450,134 @@ push)
 		printUsage
 	fi
 
+	IFS="$MULTIPLE_DEVICE_DELIMITER" read -r -a devices_array <<< "$2"
+
 	# get device listing
 	curlres=$(getDevices)
 
 	devices=$(echo "$curlres" | tr '{' '\n' | tr ',' '\n' | grep \"nickname\" | cut -d'"' -f4)
 	idens=$(echo "$curlres" | tr '{' '\n' | grep active\"\:true | tr ',' '\n' | grep iden | cut -d'"' -f4)
-	lineNum=$(echo "$devices" | grep -i -n "$2" | cut -d: -f1)
 
-	# check the lenght of $lineNum, if it returns more than one entry then the search was not unique enough
-	lineLength=$(echo $lineNum  | wc -w)
-	if [ $lineLength -gt '1' ]; then
-		err "The given device name is not unique enough. Please check 'pushbullet list'"
-		exit ${ERR_PB_DEVICE}
-	fi
+	# if there is only 1 device as a parameter, it will be still parsed to devices_array[0]
+	for one_device in "${devices_array[@]}"
+	do
 
-	dev_id=$(echo "$idens" | sed -n $lineNum'p')
-	dev_name=$(echo "$devices" | sed -n $lineNum'p')
+		lineNum=$(echo "$devices" | grep -i -n "$one_device" | cut -d: -f1)
 
-	title="$4"
-	body=""
-	if [ ! -t 0 ]; then
-		# we have something on stdin
-		body=$(cat)
-		# remove unprintable characters, or pushbullet API fails
-		body=$(echo "$body"|tr -dc '[:print:]\n'|tr '"' "'")
-	fi
-
-	if expr "$4" : 'https\?://*' > /dev/null ; then
-		body=${body:-$5}
-		url="$4"
-	elif expr "$5" : 'https\?://*' > /dev/null ; then
-		body=${body:-$6}
-		url="$5"
-	else
-		body=${body:-$5}
-		url="$6"
-	fi
-
-	# replace newlines with an escape sequence
-	body=$(printf '%s\n' "$body" | sed 's/\n/\\n/g')
-
-	case $3 in
-	note)
-		type=note
-		json="{\"type\":\"$type\",\"title\":\"$title\",\"body\":\"$body\""
-	;;
-	link)
-		type=link
-		if expr "$url" : 'https\?://*' > /dev/null ; then
-			err "Error: A valid link has to start with http:// or https://"
-			exit ${ERR_FMT}
+		# check the lenght of $lineNum, if it returns more than one entry then the search was not unique enough
+		lineLength=$(echo $lineNum  | wc -w)
+		if [ $lineLength -gt '1' ]; then
+			err "The given device name is not unique enough. Please check 'pushbullet list'"
+			exit ${ERR_PB_DEVICE}
 		fi
-		json="{\"type\":\"$type\",\"title\":\"$title\",\"body\":\"$body\",\"url\":\"$url\""
-	;;
-	file)
-		file=$4
-		if [ -d $file ]; then
-			info "Given file is actually a folder, compressing it first"
-			archivename="$(date +%s)"
-			tar cfz /tmp/"$archivename.tar.gz" "$file"
-			file=/tmp/"$archivename.tar.gz"
+
+		dev_id=$(echo "$idens" | sed -n $lineNum'p')
+		dev_name=$(echo "$devices" | sed -n $lineNum'p')
+
+		title="$4"
+		body=""
+		if [ ! -t 0 ]; then
+			# we have something on stdin
+			body=$(cat)
+			# remove unprintable characters, or pushbullet API fails
+			body=$(echo "$body"|tr -dc '[:print:]\n'|tr '"' "'")
 		fi
-		if [ -z $file ] || [ ! -f $file ]; then
-			err "Error: no valid file to push was specified"
-			exit ${ERR_NOFILE}
+
+		if expr "$4" : 'https\?://*' > /dev/null ; then
+			body=${body:-$5}
+			url="$4"
+		elif expr "$5" : 'https\?://*' > /dev/null ; then
+			body=${body:-$6}
+			url="$5"
+		else
+			body=${body:-$5}
+			url="$6"
 		fi
-		# Api docs: https://docs.pushbullet.com/v2/upload-request/
-		mimetype=$(file -i -b "$file")
+
+		# replace newlines with an escape sequence
+		body=$(printf '%s\n' "$body" | sed 's/\n/\\n/g')
+
+		case $3 in
+		note)
+			type=note
+			json="{\"type\":\"$type\",\"title\":\"$title\",\"body\":\"$body\""
+		;;
+		link)
+			type=link
+			if expr "$url" : 'https\?://*' > /dev/null ; then
+				err "Error: A valid link has to start with http:// or https://"
+				exit ${ERR_FMT}
+			fi
+			json="{\"type\":\"$type\",\"title\":\"$title\",\"body\":\"$body\",\"url\":\"$url\""
+		;;
+		file)
+			file=$4
+			if [ -d $file ]; then
+				info "Given file is actually a folder, compressing it first"
+				archivename="$(date +%s)"
+				tar cfz /tmp/"$archivename.tar.gz" "$file"
+				file=/tmp/"$archivename.tar.gz"
+			fi
+			if [ -z $file ] || [ ! -f $file ]; then
+				err "Error: no valid file to push was specified"
+				exit ${ERR_NOFILE}
+			fi
+			# Api docs: https://docs.pushbullet.com/v2/upload-request/
+			mimetype=$(file -i -b "$file")
+			set +e
+			curlres=$(curl $CURLOPTS --header "Access-Token: $PB_API_KEY" \
+			--header "Content-Type: application/json" \
+			--data-binary "{\"file_name\":\"$file\",\"file_type\":\"${mimetype%:*}\"}" \
+			--request POST \
+			"$API_URL/upload-request")
+			curlretcode=$?
+			checkCurlReturnCode "$curlretcode"
+			curlres2=$(curl $CURLOPTS --include --request POST \
+			$(echo "$curlres" | "$PROGDIR"/JSON.sh -b | grep upload_url | awk -F\" '{print $(NF-1)}') \
+			-F file=@"$file")
+			curlretcode=$?
+			set -e
+			checkCurlReturnCode "$curlretcode"
+
+			type=file
+			file_name=$(echo "$curlres" | "$PROGDIR"/JSON.sh -b | grep file_name |awk -F\" '{print $(NF-1)}')
+			file_type=$(echo "$curlres" | "$PROGDIR"/JSON.sh -b | grep file_type |awk -F\" '{print $(NF-1)}')
+			file_url=$(echo "$curlres" | "$PROGDIR"/JSON.sh -b | grep file_url |awk -F\" '{print $(NF-1)}')
+			json="{\"type\":\"$type\",\"title\":\"$title\",\"body\":\"$body\",\"file_name\":\"$file_name\",\"file_type\":\"$file_type\",\"file_url\":\"$file_url\""
+		;;
+		*)
+			printUsage
+		;;
+		esac
+
+		if [ "$one_device" = "all" ]; then
+			info "Sending to All Devices"
+			json="$json}"
+		# $one_device must be a contact/an email address if it contains an @.
+		elif expr "$one_device" : '.*@.*' > /dev/null ; then
+			info "Sending to email address $one_device"
+			json="$json,\"email\":\"$one_device\"}"
+			# since it's an email we are also creating a chat
+			$0 chat create "$one_device"
+		# $one_device must be a channel_tag if $lineNum is empty.
+		elif [ -z "$lineNum" ]; then
+			info "Sending to channel $one_device"
+			json="$json,\"channel_tag\":\"$one_device\"}"
+		# in all other cases $one_device must be the identifier of a device.
+		else
+			info "Sending to device $dev_name"
+			json="$json,\"device_iden\":\"$dev_id\"}"
+		fi
 		set +e
 		curlres=$(curl $CURLOPTS --header "Access-Token: $PB_API_KEY" \
-		--header "Content-Type: application/json" \
-		--data-binary "{\"file_name\":\"$file\",\"file_type\":\"${mimetype%:*}\"}" \
+		--header "Content-type: application/json" \
+		--data-binary "$json" \
 		--request POST \
-		"$API_URL/upload-request")
-		curlretcode=$?
-		checkCurlReturnCode "$curlretcode"
-		curlres2=$(curl $CURLOPTS --include --request POST \
-		$(echo "$curlres" | "$PROGDIR"/JSON.sh -b | grep upload_url | awk -F\" '{print $(NF-1)}') \
-		-F file=@"$file")
+		"$API_URL/pushes")
 		curlretcode=$?
 		set -e
-		checkCurlReturnCode "$curlretcode"
-
-		type=file
-		file_name=$(echo "$curlres" | "$PROGDIR"/JSON.sh -b | grep file_name |awk -F\" '{print $(NF-1)}')
-		file_type=$(echo "$curlres" | "$PROGDIR"/JSON.sh -b | grep file_type |awk -F\" '{print $(NF-1)}')
-		file_url=$(echo "$curlres" | "$PROGDIR"/JSON.sh -b | grep file_url |awk -F\" '{print $(NF-1)}')
-		json="{\"type\":\"$type\",\"title\":\"$title\",\"body\":\"$body\",\"file_name\":\"$file_name\",\"file_type\":\"$file_type\",\"file_url\":\"$file_url\""
-	;;
-	*)
-		printUsage
-	;;
-	esac
-
-	if [ "$2" = "all" ]; then
-		info "Sending to All Devices"
-		json="$json}"
-	# $2 must be a contact/an email address if it contains an @.
-	elif expr "$2" : '.*@.*' > /dev/null ; then
-		info "Sending to email address $2"
-		json="$json,\"email\":\"$2\"}"
-		# since it's an email we are also creating a chat
-		$0 chat create "$2"
-	# $2 must be a channel_tag if $lineNum is empty.
-	elif [ -z "$lineNum" ]; then
-		info "Sending to channel $2"
-		json="$json,\"channel_tag\":\"$2\"}"
-	# in all other cases $2 must be the identifier of a device.
-	else
-		info "Sending to device $dev_name"
-		json="$json,\"device_iden\":\"$dev_id\"}"
-	fi
-	set +e
-	curlres=$(curl $CURLOPTS --header "Access-Token: $PB_API_KEY" \
-	--header "Content-type: application/json" \
-	--data-binary "$json" \
-	--request POST \
-	"$API_URL/pushes")
-	curlretcode=$?
-	set -e
-	checkCurlOutput "$curlres" "$curlretcode"
+		checkCurlOutput "$curlres" "$curlretcode"
+	done
 ;;
 setup)
 	CLIENT_ID=RP56dyRen86HaaLnXBevnrDTHT8fTcr6
