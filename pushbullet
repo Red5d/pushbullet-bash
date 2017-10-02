@@ -73,6 +73,7 @@ list - List all devices and contacts in your PushBullet account. (does not requi
        additional parameters)
 push - Push data to a device or contact. (the device name can simply be
        a unique part of the name that \"list\" returns)
+       To send pushes to multiple devices, you can declare them like this (between quotes): "device1 device2"
 pushes active - List your 'active' pushes (pushes that haven't been deleted).
        Format is: iden:type:title:modified
 pushes recent - List all of your 'active' pushes since the last run.
@@ -454,7 +455,7 @@ push)
 	devices=$(echo "$curlres" | tr '{' '\n' | tr ',' '\n' | grep \"nickname\" | cut -d'"' -f4)
 	idens=$(echo "$curlres" | tr '{' '\n' | grep active\"\:true | tr ',' '\n' | grep iden | cut -d'"' -f4)
 
-	# if there is only 1 device as a parameter, it will be still parsed to devices_array[0]
+	# if there is only 1 device as a parameter, it will be still parsed to one_device
 	for one_device in $2
 	do
 		lineNum=$(echo "$devices" | grep -i -n "$one_device" | cut -d: -f1)
