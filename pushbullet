@@ -20,8 +20,6 @@ ERR_PB_OTHER=213
 
 CURLOPTS="--silent"
 
-MULTIPLE_DEVICE_DELIMITER = ":"
-
 info() {
 	if [ -z "${QUIET}" ]; then
 		echo "$@"
@@ -450,8 +448,6 @@ push)
 		printUsage
 	fi
 
-	IFS="$MULTIPLE_DEVICE_DELIMITER" read -r -a devices_array <<< "$2"
-
 	# get device listing
 	curlres=$(getDevices)
 
@@ -459,9 +455,8 @@ push)
 	idens=$(echo "$curlres" | tr '{' '\n' | grep active\"\:true | tr ',' '\n' | grep iden | cut -d'"' -f4)
 
 	# if there is only 1 device as a parameter, it will be still parsed to devices_array[0]
-	for one_device in "${devices_array[@]}"
+	for one_device in $2
 	do
-
 		lineNum=$(echo "$devices" | grep -i -n "$one_device" | cut -d: -f1)
 
 		# check the lenght of $lineNum, if it returns more than one entry then the search was not unique enough
