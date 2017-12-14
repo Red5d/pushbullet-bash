@@ -4,7 +4,7 @@
 # Author: Red5d - https://github.com/Red5d
 
 API_URL=https://api.pushbullet.com/v2
-PROGDIR="$(cd "$( dirname "$0" )" && pwd )"
+PROGDIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 unset QUIET
 
 ERR_NONE=0
