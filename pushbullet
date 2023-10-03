@@ -495,7 +495,7 @@ push)
 	;;
 	link)
 		type=link
-		if expr "$url" : 'https\?://*' > /dev/null ; then
+		if ! expr "$url" : 'https\?://*' > /dev/null ; then
 			err "Error: A valid link has to start with http:// or https://"
 			exit ${ERR_FMT}
 		fi
